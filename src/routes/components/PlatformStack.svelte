@@ -10,7 +10,7 @@
 		'External Secrets Operator',
 		'SOPS + age',
 		'helm-secrets',
-		'Traefik + cert-manager',
+		'Traefik + cert-manager + trust-manager',
 		'Cloudflare Zero Trust',
 		'Keycloak SSO',
 		'oauth2-proxy',
