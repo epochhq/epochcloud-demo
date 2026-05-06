@@ -54,8 +54,40 @@
 		const qs = new URLSearchParams({ action, ...params }).toString();
 		try {
 			const resp = await fetch(`/chaos?${qs}`);
-			const d = await resp.json();
+			// Read as text first so we can fall back gracefully when Cloudflare's
+			// edge intercepts an upstream 502/504 and serves its own HTML error
+			// page instead of passing through the demo app's JSON. Without this,
+			// resp.json() throws "Unexpected token '<', '<!DOCTYPE'..." which
+			// looks like a frontend bug rather than the upstream interception
+			// it actually demonstrates.
+			const body = await resp.text();
 			const elapsedMs = Math.round(performance.now() - start);
+			let d: Record<string, unknown>;
+			try {
+				d = JSON.parse(body);
+			} catch {
+				const looksLikeHtml = body.trimStart().startsWith('<');
+				const intercepted =
+					looksLikeHtml && (resp.status === 502 || resp.status === 504);
+				chaosHistory = [
+					{
+						action,
+						ok: false,
+						message: intercepted
+							? `Chaos: ${resp.status} ${resp.statusText} (intercepted by Cloudflare edge — origin response not delivered)`
+							: `Non-JSON response: HTTP ${resp.status} ${resp.statusText}`,
+						elapsedMs,
+						raw: {
+							status: resp.status,
+							statusText: resp.statusText,
+							bodyPreview: body.slice(0, 200)
+						},
+						timestamp: new Date().toISOString()
+					},
+					...chaosHistory
+				].slice(0, 20);
+				return;
+			}
 			if (action === 'degrade') {
 				chaosDegradeState = {
 					current: d.request_number as number,
@@ -90,8 +122,9 @@
 				},
 				...chaosHistory
 			].slice(0, 20);
+		} finally {
+			chaosLoading = false;
 		}
-		chaosLoading = false;
 	}
 </script>
 
