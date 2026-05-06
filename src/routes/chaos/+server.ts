@@ -195,7 +195,7 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 		const results: { service: string; status: string; latency_ms: number }[] = [];
 
 		const services = [
-			{ name: 'Valkey', path: '/valkey/get?key=chaos-test' },
+			{ name: 'Valkey', path: '/cache/get?key=chaos-test' },
 			{ name: 'RabbitMQ', path: '/rabbitmq/status' },
 			{ name: 'Prometheus', path: '/prometheus/demo' }
 		];
