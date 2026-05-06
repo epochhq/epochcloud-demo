@@ -54,15 +54,15 @@
 		'Knative Serving',
 		'Rybbit Analytics',
 		'GO Feature Flag',
-		'Grafana Faro (Web Vitals)'
+		'Grafana Faro (Web Vitals)',
+		'Falco Runtime',
+		'Falcosidekick',
+		'DefectDojo'
 	];
 
 	const stackReview = [
 		'LitmusChaos',
 		'fail2ban',
-		'Falco Runtime',
-		'Falcosidekick',
-		'DefectDojo',
 		'Sigma LogQL'
 	];
 
