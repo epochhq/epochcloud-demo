@@ -58,11 +58,11 @@
 		'Falco Runtime',
 		'Falcosidekick',
 		'DefectDojo',
-		'Loki Ruler (LogQL)'
+		'Loki Ruler (LogQL)',
+		'LitmusChaos'
 	];
 
 	const stackReview = [
-		'LitmusChaos',
 		'fail2ban'
 	];
 
