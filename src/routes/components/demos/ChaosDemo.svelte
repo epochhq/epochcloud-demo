@@ -74,7 +74,7 @@
 						action,
 						ok: false,
 						message: intercepted
-							? `Chaos: ${resp.status} ${resp.statusText} (intercepted by Cloudflare edge — origin response not delivered)`
+							? `Chaos: ${resp.status} ${resp.statusText} (intercepted by Cloudflare edge - origin response not delivered)`
 							: `Non-JSON response: HTTP ${resp.status} ${resp.statusText}`,
 						elapsedMs,
 						raw: {

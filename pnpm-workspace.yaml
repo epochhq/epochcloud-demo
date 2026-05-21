@@ -1,11 +1,11 @@
 # pnpm 11+ stores build-script approval decisions here, not in package.json.
 # Each `false` entry denies the package's lifecycle scripts and silences
-# ERR_PNPM_IGNORED_BUILDS — which otherwise hard-fails non-TTY installs
+# ERR_PNPM_IGNORED_BUILDS - which otherwise hard-fails non-TTY installs
 # (i.e. CI / Docker buildah, where pnpm can't prompt).
 #
 # Why these three are denied:
 # - prisma / @prisma/engines: transitive via better-auth's optional Prisma
-#   adapter. We use `pg` directly, never load Prisma at runtime — its
+#   adapter. We use `pg` directly, never load Prisma at runtime - its
 #   postinstall would download large engine binaries we don't use.
 # - protobufjs: transitive via @grpc/grpc-js (OTLP gRPC exporter). The
 #   postinstall pre-compiles a perf cache; runtime falls back to dynamic

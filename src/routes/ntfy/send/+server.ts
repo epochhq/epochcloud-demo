@@ -13,7 +13,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
 		const rawTopic = String(body.topic || 'epochcloud-demo');
-		// Sanitize topic: alphanumeric, hyphens, underscores only — no path traversal
+		// Sanitize topic: alphanumeric, hyphens, underscores only - no path traversal
 		const topic = rawTopic.replace(/[^a-zA-Z0-9_-]/g, '');
 		if (!topic) {
 			return new Response(JSON.stringify({ success: false, error: 'Invalid topic name' }), {

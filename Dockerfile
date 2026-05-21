@@ -6,7 +6,7 @@ RUN npm install -g corepack --force && corepack enable
 
 WORKDIR /app
 
-# Copy package files. pnpm-workspace.yaml is required for pnpm 11+ —
+# Copy package files. pnpm-workspace.yaml is required for pnpm 11+ -
 # it holds the `allowBuilds` decisions without which `pnpm install`
 # hard-fails in non-TTY (CI) with ERR_PNPM_IGNORED_BUILDS.
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
@@ -40,7 +40,7 @@ FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359ef
 # Install ca-certificates for HTTPS
 RUN apk --no-cache add ca-certificates
 
-# Build info — propagated from builder stage for $env/dynamic/public
+# Build info - propagated from builder stage for $env/dynamic/public
 ARG VERSION=dev
 ARG COMMIT=unknown
 ARG BUILD_TIME=unknown

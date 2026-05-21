@@ -13,7 +13,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		return new Response(
 			JSON.stringify({
 				success: false,
-				error: 'CROWDSEC_BOUNCER_KEY not set — IP lookup unavailable'
+				error: 'CROWDSEC_BOUNCER_KEY not set - IP lookup unavailable'
 			}),
 			{ status: 503, headers: { 'Content-Type': 'application/json' } }
 		);
@@ -48,7 +48,7 @@ export const GET: RequestHandler = async ({ url }) => {
 				{ headers: { 'Content-Type': 'application/json' } }
 			);
 		} else if (resp.status === 404) {
-			// 404 means no decisions — IP is clean
+			// 404 means no decisions - IP is clean
 			return new Response(
 				JSON.stringify({
 					success: true,

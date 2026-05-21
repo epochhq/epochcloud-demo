@@ -10,7 +10,7 @@ import {
 } from '$lib/server/metrics.js';
 import os from 'node:os';
 
-// Demo counter — users can increment this to see Prometheus metrics in action
+// Demo counter - users can increment this to see Prometheus metrics in action
 const demoCounter = new client.Counter({
 	name: 'epochcloud_demo_counter_total',
 	help: 'Demo counter incremented by users from the dashboard',
