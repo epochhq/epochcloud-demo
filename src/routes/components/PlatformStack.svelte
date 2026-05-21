@@ -49,6 +49,7 @@
 		'RabbitMQ',
 		'Valkey Cache',
 		'CrowdSec Threat Intel',
+		'Beelzebub (Honeypot)',
 		'Maddy SMTP',
 		'BetterAuth + Hono',
 		'Resend Email',
@@ -67,7 +68,7 @@
 		'fail2ban'
 	];
 
-	const stackPending = ['Cluster Honeypot', 'Kanister (data-recovery drills)'];
+	const stackPending = ['Kanister (data-recovery drills)'];
 
 	const total = stackOnline.length + stackReview.length + stackPending.length;
 </script>
