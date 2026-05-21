@@ -50,7 +50,7 @@ async function init() {
 	// Start RabbitMQ consumer if in consumer mode
 	if (config.consumerMode) {
 		await startConsumer();
-		log('info', 'Consumer mode active — only /health and /metrics routes available');
+		log('info', 'Consumer mode active - only /health and /metrics routes available');
 	}
 }
 
@@ -90,7 +90,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	// Consumer mode: block all routes except /health and /metrics
 	if (config.consumerMode && !consumerAllowedPaths.has(pathname)) {
-		return new Response('Consumer mode — only /health and /metrics available', { status: 404 });
+		return new Response('Consumer mode - only /health and /metrics available', { status: 404 });
 	}
 
 	const start = performance.now();

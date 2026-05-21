@@ -20,7 +20,7 @@ export interface CnpgItem {
 	originated_in: string;
 }
 
-// Schema-ensure SQL — CREATE TABLE IF NOT EXISTS is idempotent and
+// Schema-ensure SQL - CREATE TABLE IF NOT EXISTS is idempotent and
 // cheap (information_schema lookup) when the table already exists, so
 // it's safe to call on every reconnect attempt.
 const ENSURE_SCHEMA_SQL = `
@@ -64,7 +64,7 @@ export async function initCnpg(): Promise<void> {
 
 	pool = new Pool({
 		connectionString: config.cnpg.url,
-		// Small pool — this is a demo, not a hot path. Per-pod limit kept
+		// Small pool - this is a demo, not a hot path. Per-pod limit kept
 		// low so N preview pods sharing a dev DB don't exhaust the
 		// upstream Postgres `max_connections` (the env-isolation task
 		// will route through a CNPG Pooler / PgBouncer; until then
@@ -92,7 +92,7 @@ export async function initCnpg(): Promise<void> {
 		return;
 	}
 
-	// Background retry loop — handles the cold-start race where the
+	// Background retry loop - handles the cold-start race where the
 	// CNPG Cluster is provisioning but not yet Ready when this pod
 	// boots. Fire-and-forget; CRUD operations check `schemaReady`
 	// independently.
@@ -111,7 +111,7 @@ export async function initCnpg(): Promise<void> {
 	})();
 }
 
-// CRUD operations call this defensively — the schema may have
+// CRUD operations call this defensively - the schema may have
 // disappeared if the upstream Cluster was deleted+recreated by the
 // daily env-isolation sync. Cheap idempotent re-ensure.
 async function ensureSchemaIfNeeded(): Promise<void> {

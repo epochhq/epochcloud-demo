@@ -139,7 +139,7 @@
 		</div>
 		{#if itemsLoaded}
 			{#if items.length === 0}
-				<p class="empty">No items yet — create one above.</p>
+				<p class="empty">No items yet - create one above.</p>
 			{:else}
 				<ul class="items">
 					{#each items as item (item.id)}

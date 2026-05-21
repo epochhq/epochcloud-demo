@@ -50,7 +50,7 @@ async function connect(): Promise<void> {
 		// rabbitmq.com Topology Operator (Queue CR in
 		// kubernetes/apps/epochcloud-demo/templates/rabbitmq-demo.yaml).
 		// assertQueue would re-declare with default args (classic queue,
-		// no x-queue-type) — when the operator's Queue is `type: quorum`
+		// no x-queue-type) - when the operator's Queue is `type: quorum`
 		// the type-mismatch fails the channel with PRECONDITION_FAILED.
 		// checkQueue only verifies existence; the operator stays the
 		// single source of truth for queue type / durability / args.
