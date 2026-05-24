@@ -17,6 +17,7 @@
 		'Longhorn Storage',
 		'CloudNativePG',
 		'Harbor Registry',
+		'Spegel (image mirror)',
 		'Argo Workflows CI',
 		'Argo Events',
 		'Kyverno Policies',
