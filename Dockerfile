@@ -1,5 +1,5 @@
 # Build stage
-FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea AS builder
+FROM docker.io/library/node:26-alpine@sha256:7c6af15abe4e3de859690e7db171d0d711bf37d27528eddfe625b2fe89e097f8 AS builder
 
 # Enable corepack for pnpm (corepack unbundled in Node 25+, --force needed to overwrite existing shims)
 RUN npm install -g corepack --force && corepack enable
@@ -35,7 +35,7 @@ RUN pnpm build
 RUN pnpm prune --prod
 
 # Runtime stage
-FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea
+FROM docker.io/library/node:26-alpine@sha256:7c6af15abe4e3de859690e7db171d0d711bf37d27528eddfe625b2fe89e097f8
 
 # Install ca-certificates for HTTPS
 RUN apk --no-cache add ca-certificates
