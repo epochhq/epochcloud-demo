@@ -26,6 +26,7 @@
 		'SLSA Build L3 Provenance',
 		'Syft + Grype',
 		'Semgrep + Trivy',
+		'Pluto (deprecated APIs)',
 		'OWASP ZAP',
 		'Headlamp',
 		'kubernetes-reflector',
