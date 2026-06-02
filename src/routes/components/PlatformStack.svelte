@@ -38,6 +38,7 @@
 		'Linkerd mTLS',
 		'Prometheus + AlertManager',
 		'Grafana',
+		'Gatus',
 		'Alloy Collector',
 		'Loki Logs',
 		'Tempo Traces',
