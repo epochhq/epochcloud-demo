@@ -4,14 +4,6 @@ FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359ef
 # Enable corepack for pnpm (corepack unbundled in Node 25+, --force needed to overwrite existing shims)
 RUN npm install -g corepack --force && corepack enable
 
-# corepack downloads pnpm with Node's built-in fetch, which IGNORES
-# HTTP_PROXY/HTTPS_PROXY unless this flag is set (Node >=24). The platform's
-# build pods are egress-default-deny with a forward proxy injected via env -
-# without this, `corepack install` dials registry.npmjs.org directly and the
-# CNI drops it ("Internal Error: Error when performing the request"). npm and
-# pnpm themselves honor the proxy env natively.
-ENV NODE_USE_ENV_PROXY=1
-
 WORKDIR /app
 
 # Copy package files. pnpm-workspace.yaml is required for pnpm 11+ -
@@ -19,8 +11,13 @@ WORKDIR /app
 # hard-fails in non-TTY (CI) with ERR_PNPM_IGNORED_BUILDS.
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
 
-# Install the exact pnpm version from packageManager field in package.json
-RUN corepack install
+# Install the exact pnpm version pinned in package.json's packageManager field.
+# Installed via npm, NOT `corepack install`: corepack's bundled fetch ignores
+# proxy env entirely (HTTP_PROXY and Node's NODE_USE_ENV_PROXY alike), so on
+# the platform's egress-default-deny build pods it dials registry.npmjs.org
+# directly and the CNI drops it. npm honors the proxy natively - the corepack
+# global install in the first RUN proves the npm+proxy path works.
+RUN npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
 
 # Install dependencies (no --frozen-lockfile: survives Renovate lockfile lag between packageManager bumps)
 RUN pnpm install
