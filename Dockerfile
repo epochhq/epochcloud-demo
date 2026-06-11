@@ -1,9 +1,6 @@
 # Build stage
 FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea AS builder
 
-# Enable corepack for pnpm (corepack unbundled in Node 25+, --force needed to overwrite existing shims)
-RUN npm install -g corepack --force && corepack enable
-
 WORKDIR /app
 
 # Copy package files. pnpm-workspace.yaml is required for pnpm 11+ -
@@ -11,13 +8,20 @@ WORKDIR /app
 # hard-fails in non-TTY (CI) with ERR_PNPM_IGNORED_BUILDS.
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
 
-# Install the exact pnpm version pinned in package.json's packageManager field.
-# Installed via npm, NOT `corepack install`: corepack's bundled fetch ignores
-# proxy env entirely (HTTP_PROXY and Node's NODE_USE_ENV_PROXY alike), so on
-# the platform's egress-default-deny build pods it dials registry.npmjs.org
-# directly and the CNI drops it. npm honors the proxy natively - the corepack
-# global install in the first RUN proves the npm+proxy path works.
-RUN npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
+# Install the exact pnpm version pinned in package.json's packageManager field,
+# via npm and WITHOUT corepack. Two hard constraints, both learned the hard way
+# (see git history - do NOT reintroduce corepack here):
+#  1. PROXY: build pods are egress-default-deny with a forward proxy injected via
+#     env. corepack fetches pnpm with Node's built-in fetch, which ignores
+#     HTTP_PROXY and NODE_USE_ENV_PROXY (commits 0d0710e, a3a23ef), so
+#     `corepack install` dials registry.npmjs.org directly and the CNI drops it.
+#     npm honors the proxy natively, so it is the only fetcher that works here.
+#  2. NO SHIM COLLISION: we previously also ran `corepack enable`, which writes a
+#     /usr/local/bin/pnpm shim, and this npm install then died with
+#     "EEXIST: /usr/local/bin/pnpm" - the build's actual failure. corepack is
+#     unused once pnpm is npm-installed, so it is removed entirely; --force keeps
+#     this install idempotent against any pnpm shim a future base image ships.
+RUN npm install -g --force "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
 
 # Install dependencies (no --frozen-lockfile: survives Renovate lockfile lag between packageManager bumps)
 RUN pnpm install
