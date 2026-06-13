@@ -4,16 +4,15 @@
 	import FlowArrow from '$lib/components/flow/FlowArrow.svelte';
 	import type { FlowAccent } from '$lib/components/flow/FlowNode.svelte';
 
-	// CI/CD pipeline flow. Two paths: application builds (Argo Workflows ->
-	// Harbor -> Kargo -> Rollouts) and infra changes (OpenTofu via Argo
-	// Workflows). Steps mirror the app-baseline DAG in
-	// workflow-templates/app/main.yaml and the per-product Kargo pipeline.
-	type Lane = {
-		tag: string;
-		tone: 'app' | 'infra';
-		accent: FlowAccent;
-		steps: { label: string; sub?: string }[];
-	};
+	// CI/CD flow. Two distinct pipelines. The application path is the Argo
+	// Workflows build DAG (workflow-templates/app/main.yaml) feeding Kargo and
+	// Argo Rollouts. The infrastructure path is intentionally split: Argo
+	// Workflows only VALIDATES IaC on PRs (infra/main.yaml runs tofu validate +
+	// the IaC scanners, never apply); the real tofu apply runs from the local
+	// scripts/deploy.sh an operator invokes, and ArgoCD separately GitOps-syncs
+	// the rendered manifests.
+	type Step = { label: string; sub?: string; accent?: FlowAccent };
+	type Lane = { tag: string; tone: 'app' | 'infra'; accent: FlowAccent; steps: Step[] };
 
 	const lanes: Lane[] = [
 		{
@@ -26,26 +25,36 @@
 				{ label: 'Pre-build scans', sub: 'Semgrep, TruffleHog, OSV' },
 				{ label: 'Buildah', sub: 'build + push image' },
 				{ label: 'Post-build scans', sub: 'Trivy, Syft, Grype' },
-				{ label: 'Cosign sign', sub: 'keyless signature' },
+				{ label: 'Cosign sign', sub: 'self-managed key' },
 				{ label: 'SLSA attest', sub: 'provenance v1.0' },
 				{ label: 'Harbor', sub: 'signed digest' },
 				{ label: 'Kargo Warehouse', sub: 'new freight' },
 				{ label: 'Promote stages', sub: 'dev -> staging -> prod' },
-				{ label: 'Argo Rollouts', sub: 'progressive delivery' },
-				{ label: 'Serving', sub: 'live traffic' }
-			]
-		},
-		{
-			tag: 'Infrastructure path',
-			tone: 'infra',
-			accent: 'purple',
-			steps: [
-				{ label: 'git push', sub: 'IaC change' },
-				{ label: 'Argo Workflows', sub: 'OpenTofu plan + apply' },
-				{ label: 'ArgoCD sync', sub: 'reconcile cluster' },
-				{ label: 'Serving', sub: 'platform updated' }
+				{ label: 'Argo Rollouts', sub: 'canary delivery' },
+				{ label: 'Serving', sub: 'live traffic', accent: 'green' }
 			]
 		}
+	];
+
+	// Infrastructure path renders as two sub-tracks sharing one PR origin: the
+	// PR-gate validation lane and the operator-driven apply + GitOps lane.
+	const infraValidate: Step[] = [
+		{ label: 'IaC pull request', sub: 'GitHub' },
+		{ label: 'Argo Workflows', sub: 'infra-validate' },
+		{ label: 'tofu validate', sub: 'syntax + config' },
+		{ label: 'IaC scans', sub: 'Checkov, Trivy, Pluto, TFLint' }
+	];
+
+	const infraApply: Step[] = [
+		{ label: 'merge to main', sub: 'reviewed' },
+		{ label: 'bin/ deploy', sub: 'operator runs tofu apply' },
+		{ label: 'Proxmox + Talos', sub: 'VMs provisioned' },
+		{ label: 'Cluster', sub: 'platform updated', accent: 'green' }
+	];
+
+	const infraSync: Step[] = [
+		{ label: 'ArgoCD', sub: 'GitOps reconcile' },
+		{ label: 'Manifests applied', sub: 'desired state', accent: 'green' }
 	];
 </script>
 
@@ -55,7 +64,7 @@
 			<span class="lane-tag lane-{lane.tone}">{lane.tag}</span>
 			<div class="flow-track">
 				{#each lane.steps as step, i (step.label)}
-					<FlowNode label={step.label} sub={step.sub} accent={lane.accent} />
+					<FlowNode label={step.label} sub={step.sub} accent={step.accent ?? lane.accent} />
 					{#if i < lane.steps.length - 1}
 						<FlowArrow size="0.85rem" />
 					{/if}
@@ -64,9 +73,48 @@
 		</div>
 	{/each}
 
+	<div class="flow-lane">
+		<span class="lane-tag lane-infra">Infrastructure path</span>
+		<div class="infra-sub">
+			<span class="sub-tag">PR validation (no apply)</span>
+			<div class="flow-track">
+				{#each infraValidate as step, i (step.label)}
+					<FlowNode label={step.label} sub={step.sub} accent={step.accent ?? 'purple'} />
+					{#if i < infraValidate.length - 1}
+						<FlowArrow size="0.85rem" />
+					{/if}
+				{/each}
+			</div>
+		</div>
+		<div class="infra-sub">
+			<span class="sub-tag">Operator apply</span>
+			<div class="flow-track">
+				{#each infraApply as step, i (step.label)}
+					<FlowNode label={step.label} sub={step.sub} accent={step.accent ?? 'purple'} />
+					{#if i < infraApply.length - 1}
+						<FlowArrow size="0.85rem" />
+					{/if}
+				{/each}
+			</div>
+		</div>
+		<div class="infra-sub">
+			<span class="sub-tag">GitOps sync (manifests)</span>
+			<div class="flow-track">
+				{#each infraSync as step, i (step.label)}
+					<FlowNode label={step.label} sub={step.sub} accent={step.accent ?? 'purple'} />
+					{#if i < infraSync.length - 1}
+						<FlowArrow size="0.85rem" />
+					{/if}
+				{/each}
+			</div>
+		</div>
+	</div>
+
 	{#snippet note()}
-		Nothing reaches a cluster by hand. Every image is signed and provenance-attested before a
-		deployable tag exists, and Kargo gates prod promotion on manual approval.
+		Nothing reaches a cluster by hand. Application images are signed and provenance-attested before a
+		deployable tag exists, and Kargo gates prod on manual approval. Argo Workflows only validates
+		infrastructure on PRs; the actual tofu apply runs from the deploy script, and ArgoCD reconciles
+		the rendered manifests separately.
 	{/snippet}
 </FlowCard>
 
@@ -75,6 +123,10 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.625rem;
+	}
+
+	.flow-lane + .flow-lane {
+		margin-top: 0.5rem;
 	}
 
 	.lane-tag {
@@ -98,6 +150,21 @@
 		color: #a78bfa;
 		background: rgba(139, 92, 246, 0.1);
 		border-color: rgba(139, 92, 246, 0.25);
+	}
+
+	.infra-sub {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.sub-tag {
+		font-size: 0.62rem;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--text-secondary);
+		font-family: 'JetBrains Mono', 'SF Mono', monospace;
 	}
 
 	.flow-track {
