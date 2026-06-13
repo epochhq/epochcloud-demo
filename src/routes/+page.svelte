@@ -3,6 +3,9 @@
 	import Header from './components/Header.svelte';
 	import BuildBar from './components/BuildBar.svelte';
 	import PlatformStack from './components/PlatformStack.svelte';
+	import HowDeploy from './components/HowDeploy.svelte';
+	import HowSecurity from './components/HowSecurity.svelte';
+	import HowBackup from './components/HowBackup.svelte';
 	import Dashboards from './components/Dashboards.svelte';
 	import DemoTabs from './components/DemoTabs.svelte';
 	import Footer from './components/Footer.svelte';
@@ -67,6 +70,9 @@
 		environment={data.environment}
 	/>
 	<PlatformStack />
+	<HowDeploy />
+	<HowSecurity />
+	<HowBackup />
 	<Dashboards domain={data.domain} />
 
 	<section class="section">

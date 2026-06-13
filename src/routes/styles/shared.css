@@ -402,6 +402,25 @@ select.input {
 	color: var(--muted-fg);
 }
 
+/* ─── Flow Diagrams (shared accent palette) ─── */
+/* Accent edge color for flow nodes / phase panels, exposed as an RGB triple so
+   each consumer sets its own alpha (leaf nodes 0.5, wider phase edges 0.6). */
+.flow-accent-blue {
+	--flow-accent-rgb: 59 130 246;
+}
+
+.flow-accent-purple {
+	--flow-accent-rgb: 139 92 246;
+}
+
+.flow-accent-amber {
+	--flow-accent-rgb: 234 179 8;
+}
+
+.flow-accent-green {
+	--flow-accent-rgb: 34 197 94;
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 768px) {
 	.dashboard {

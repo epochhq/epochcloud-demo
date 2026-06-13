@@ -66,14 +66,14 @@
 		'Falcosidekick',
 		'DefectDojo',
 		'Loki Ruler (LogQL)',
-		'LitmusChaos'
+		'LitmusChaos',
+		'fail2ban (brute-force)',
+		'Kanister (data-recovery drills)'
 	];
 
-	const stackReview = [
-		'fail2ban'
-	];
+	const stackReview: string[] = [];
 
-	const stackPending = ['Kanister (data-recovery drills)'];
+	const stackPending: string[] = [];
 
 	const total = stackOnline.length + stackReview.length + stackPending.length;
 </script>
@@ -104,11 +104,15 @@
 				<span class="stack-group-label">Under Review</span>
 				<span class="stack-group-count">{stackReview.length}</span>
 			</div>
-			<div class="chip-grid">
-				{#each stackReview as item (item)}
-					<span class="chip chip-review">{item}</span>
-				{/each}
-			</div>
+			{#if stackReview.length > 0}
+				<div class="chip-grid">
+					{#each stackReview as item (item)}
+						<span class="chip chip-review">{item}</span>
+					{/each}
+				</div>
+			{:else}
+				<p class="stack-empty">All components reviewed and promoted.</p>
+			{/if}
 		</div>
 
 		<div class="stack-group">
@@ -117,11 +121,15 @@
 				<span class="stack-group-label">Pending</span>
 				<span class="stack-group-count">{stackPending.length}</span>
 			</div>
-			<div class="chip-grid">
-				{#each stackPending as item (item)}
-					<span class="chip chip-pending">{item}</span>
-				{/each}
-			</div>
+			{#if stackPending.length > 0}
+				<div class="chip-grid">
+					{#each stackPending as item (item)}
+						<span class="chip chip-pending">{item}</span>
+					{/each}
+				</div>
+			{:else}
+				<p class="stack-empty">Current infrastructure stack fully implemented and online.</p>
+			{/if}
 		</div>
 	</div>
 </section>
@@ -184,6 +192,13 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.375rem;
+	}
+
+	.stack-empty {
+		font-size: 0.75rem;
+		color: var(--muted-fg);
+		font-style: italic;
+		margin: 0;
 	}
 
 	.chip {
