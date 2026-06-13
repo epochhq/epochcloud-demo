@@ -22,7 +22,7 @@
 		'Argo Events',
 		'Kyverno Policies',
 		'Cosign Signing',
-		'Sigstore (Fulcio + Rekor)',
+		'Kyverno verifyImages',
 		'SLSA Build L3 Provenance',
 		'Syft + Grype',
 		'Semgrep + Trivy',
