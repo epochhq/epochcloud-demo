@@ -73,7 +73,11 @@
 
 	const stackReview: string[] = [];
 
-	const stackPending: string[] = [];
+	const stackPending: string[] = [
+		'Dagger Pipeline',
+		'Skaffold Inner Loop',
+		'Fastlane (iOS + Android)'
+	];
 
 	const total = stackOnline.length + stackReview.length + stackPending.length;
 </script>
