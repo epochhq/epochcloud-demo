@@ -3,6 +3,7 @@
 
 	const dashboards = [
 		{ name: 'Grafana', sub: 'grafana', desc: 'Metrics & Dashboards' },
+		{ name: 'Gatus', sub: 'status', desc: 'Status & Uptime' },
 		{ name: 'Headlamp', sub: 'headlamp', desc: 'K8s Dashboard' },
 		{ name: 'Keycloak', sub: 'auth', desc: 'Identity Provider' },
 		{ name: 'ArgoCD', sub: 'argocd', desc: 'GitOps Delivery' },
