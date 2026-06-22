@@ -68,16 +68,15 @@
 		'Loki Ruler (LogQL)',
 		'LitmusChaos',
 		'fail2ban (brute-force)',
-		'Kanister (data-recovery drills)'
-	];
-
-	const stackReview: string[] = [];
-
-	const stackPending: string[] = [
+		'Kanister (data-recovery drills)',
 		'Dagger Pipeline',
 		'Skaffold Inner Loop',
 		'Fastlane (iOS + Android)'
 	];
+
+	const stackReview: string[] = [];
+
+	const stackPending: string[] = [];
 
 	const total = stackOnline.length + stackReview.length + stackPending.length;
 </script>
