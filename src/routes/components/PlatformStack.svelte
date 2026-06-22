@@ -78,7 +78,8 @@
 
 	const stackPending: string[] = [
 		'Fulcio (keyless signing CA)',
-		'Rekor (signing transparency log)'
+		'Rekor (signing transparency log)',
+		'Tessera (transparency-log engine)'
 	];
 
 	const total = stackOnline.length + stackReview.length + stackPending.length;
