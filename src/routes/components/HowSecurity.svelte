@@ -4,11 +4,12 @@
 
 	// Security model as a full defense-in-depth view. Five layers, each verified
 	// against platform-identity, platform-network, platform-security,
-	// platform-ci and platform-tools manifests. Cosign signs with a self-managed
-	// key via OCI referrers (--key, --use-signing-config=false, --tlog-upload=false:
-	// no Fulcio/Rekor PKI), so it is key-based, not keyless. Cloudflare is a
-	// DNS-proxy/WAF edge locked to CF IP ranges. WireGuard pod encryption is the
-	// Cilium encryption mode set in ansible/tasks/cilium-deploy.yml.
+	// platform-ci and platform-tools manifests. Cosign signs every CI image twice
+	// via OCI referrers: a self-managed ECDSA key signature plus an additive
+	// keyless signature against the self-hosted Sigstore stack (Fulcio CA, Rekor v2
+	// transparency log, RFC3161 TSA, TUF trust root). Kyverno admission verifies
+	// either. Cloudflare is a DNS-proxy/WAF edge locked to CF IP ranges. WireGuard
+	// pod encryption is the Cilium encryption mode set in ansible/tasks/cilium-deploy.yml.
 	type Item = { name: string; sub: string };
 	type Layer = { tag: string; accent: FlowAccent; items: Item[] };
 
@@ -41,7 +42,7 @@
 			accent: 'amber',
 			items: [
 				{ name: 'Kyverno', sub: 'admission policy' },
-				{ name: 'Cosign', sub: 'key-based signing' },
+				{ name: 'Cosign', sub: 'key + keyless signing' },
 				{ name: 'SLSA L3', sub: 'build provenance' },
 				{ name: 'Trivy / Syft / Grype', sub: 'image + SBOM scan' },
 				{ name: 'Semgrep', sub: 'SAST' },

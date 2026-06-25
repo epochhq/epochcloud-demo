@@ -25,7 +25,7 @@
 				{ label: 'Pre-build scans', sub: 'Semgrep, TruffleHog, OSV' },
 				{ label: 'Buildah', sub: 'build + push image' },
 				{ label: 'Post-build scans', sub: 'Trivy, Syft, Grype' },
-				{ label: 'Cosign sign', sub: 'self-managed key' },
+				{ label: 'Cosign sign', sub: 'key + keyless (Fulcio)' },
 				{ label: 'SLSA attest', sub: 'provenance v1.0' },
 				{ label: 'Harbor', sub: 'signed digest' },
 				{ label: 'Kargo Warehouse', sub: 'new freight' },
