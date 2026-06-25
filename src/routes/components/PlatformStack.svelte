@@ -23,6 +23,11 @@
 		'Kyverno Policies',
 		'Cosign Signing',
 		'Kyverno verifyImages',
+		'Fulcio (keyless signing CA)',
+		'Rekor (signing transparency log)',
+		'Tessera (Rekor v2 log storage)',
+		'TUF (self-hosted trust root)',
+		'TSA (RFC3161 timestamps)',
 		'SLSA Build L3 Provenance',
 		'Syft + Grype',
 		'Semgrep + Trivy',
@@ -76,12 +81,7 @@
 
 	const stackReview: string[] = [];
 
-	const stackPending: string[] = [
-		'Fulcio (keyless signing CA)',
-		'Rekor (signing transparency log)',
-		'Tessera (transparency-log engine)',
-		'TUF (self-hosted trust root)'
-	];
+	const stackPending: string[] = [];
 
 	const total = stackOnline.length + stackReview.length + stackPending.length;
 </script>
