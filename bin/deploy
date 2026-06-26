@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# deploy - keyless dev-image push for this epochcloud app repo.
+#
+# A dev types `deploy` (a bare command on PATH in the direnv/flake devShell). It
+# builds THIS app's dev image on the dev machine and pushes it to the Harbor
+# `epochcloud/<image>-dev` repo, which the dev Kargo Warehouse discovers and
+# auto-promotes to the dev Stage (the image-verification policy admits it
+# per-tenant). `pnpm build` and `pnpm dev` are for LOCAL build/run; `deploy` is
+# the only command that ships an image.
+#
+# It carries NO build logic: it runs the PUBLISHED slim ci-tools-build image
+# (the ci-tools binary + buildah + cosign - NOT the 1.4 GB full ci-tools the
+# in-cluster scan/sign steps use) via podman and invokes `ci-tools build-local`.
+# App repos never copy the build pipeline and never need the platform repo, SOPS,
+# or cluster access. The pinned image tag is the single line an app bumps to
+# adopt a new build-tool version.
+#
+# Signing is KEYLESS: the dev authorizes the build in a browser (the OAuth2
+# device-authorization grant against their tenant realm's public cosign-dev
+# client), and the build container mints a Fulcio cert bound to their verified
+# email - no per-dev cosign private key to distribute. The image gets a keyless
+# signature AND a keyless SLSA Provenance attestation.
+#
+# Credentials are supplied OUT-OF-BAND via environment variables (no SOPS, no
+# kubeconfig): a Harbor robot scoped to push ONLY epochcloud/*-dev. Put them in a
+# gitignored .env (direnv loads it via .envrc) or your shell profile; the
+# operator distributes them to app devs. See .env.example.
+#
+# An app dev needs ONLY: podman (with a running `podman machine`), the Harbor
+# push creds below, and a dev-user account in their tenant realm (for the
+# browser approval). No cosign key.
+#
+# Usage:
+#   deploy [--branch <branch>]
+#
+# Required environment:
+#   EPOCHCLOUD_REGISTRY_HOST   Harbor host (e.g. registry.epoch.engineering)
+#   HARBOR_DEV_ROBOT_USER      scoped robot username (robot$epochcloud-dev-push+...)
+#   HARBOR_DEV_ROBOT_TOKEN     scoped robot secret
+#
+# Optional environment:
+#   EPOCHCLOUD_IMAGE_NAME      Harbor image base name (no -dev). Defaults to the
+#                              git repo name; this is a single-image app, so the
+#                              default is normally correct.
+#   EPOCHCLOUD_DOCKERFILE      Dockerfile path relative to the build context (default: Dockerfile)
+#   EPOCHCLOUD_BUILD_CONTEXT   build context dir (default: repo root)
+#   EPOCHCLOUD_SIGNING_TENANT  tenant realm slug for the keyless signing identity.
+#                              Defaults to the git remote owner (the tenant that
+#                              owns this app repo).
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Pinned ci-tools image tag. Bump this one line to adopt a new build-tool
+# version. The image bundles buildah + cosign + the ci-tools binary; nothing
+# about the build pipeline is vendored into the app repo.
+# (TODO: pin to an immutable digest once the ci-tools image publishes one;
+# :latest tracks the platform repo's default branch in the meantime.)
+# ---------------------------------------------------------------------------
+EPOCHCLOUD_CI_TOOLS_TAG="${EPOCHCLOUD_CI_TOOLS_TAG:-latest}"
+
+# Resolve the script's own absolute path BEFORE cd so --help can still read it.
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+BRANCH=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --branch) BRANCH="$2"; shift 2 ;;
+        # Print the usage header: every leading comment line after the shebang,
+        # stripped of its "# " prefix, up to the first non-comment line. No magic
+        # line numbers to drift when the header is edited.
+        -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$SELF"; exit 0 ;;
+        *) echo "unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+# Required credentials / registry (fail fast with a precise message).
+: "${EPOCHCLOUD_REGISTRY_HOST:?export EPOCHCLOUD_REGISTRY_HOST=<harbor-host>}"
+: "${HARBOR_DEV_ROBOT_USER:?export HARBOR_DEV_ROBOT_USER (the epochcloud/*-dev scoped robot)}"
+: "${HARBOR_DEV_ROBOT_TOKEN:?export HARBOR_DEV_ROBOT_TOKEN (the scoped robot secret)}"
+
+command -v podman >/dev/null 2>&1 || {
+    echo "podman not found. Install podman and run 'podman machine init && podman machine start'." >&2
+    exit 1
+}
+
+# Git-derived build inputs.
+[[ -n "$BRANCH" ]] || BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+COMMIT_SHA="$(git rev-parse HEAD)"
+REPO_URL="$(git remote get-url origin 2>/dev/null || echo '')"
+REPO_NAME="$(basename "${REPO_URL%.git}")"
+REPO_OWNER="$(printf '%s' "$REPO_URL" | sed -E 's#.*[:/]([^/]+)/[^/]+(\.git)?$#\1#')"
+
+# Keyless signing endpoints + the tenant OIDC issuer, DERIVED from the Harbor
+# host (registry.<domain> -> <domain>), never hardcoded. The signing identity is
+# the dev's tenant realm; the tenant slug defaults to the git remote owner (the
+# tenant that owns this app repo), overridable via EPOCHCLOUD_SIGNING_TENANT. The
+# endpoints are the PUBLIC dev ingress (a dev Mac is outside the cluster).
+DOMAIN="${EPOCHCLOUD_REGISTRY_HOST#registry.}"
+TENANT="${EPOCHCLOUD_SIGNING_TENANT:-$REPO_OWNER}"
+OIDC_ISSUER="https://auth.${DOMAIN}/realms/${TENANT}"
+FULCIO_URL="https://fulcio.${DOMAIN}"
+REKOR_URL="https://rekor.${DOMAIN}"
+# cosign POSTs to the TSA endpoint verbatim, so it must be the full path.
+TSA_URL="https://timestamp.${DOMAIN}/api/v1/timestamp"
+TUF_MIRROR_URL="https://tuf.${DOMAIN}"
+
+# Image base name: explicit override, else the repo name. build-local appends the
+# -dev suffix so this dev build feeds the dev Warehouse; the CI repo is written
+# only by the in-cluster staging-promotion build.
+IMAGE_BASE="${EPOCHCLOUD_IMAGE_NAME:-$REPO_NAME}"
+DOCKERFILE="${EPOCHCLOUD_DOCKERFILE:-Dockerfile}"
+BUILD_CONTEXT="${EPOCHCLOUD_BUILD_CONTEXT:-.}"
+BUILD_CONTEXT_ABS="$(cd "$ROOT_DIR/$BUILD_CONTEXT" && pwd)"
+
+CI_TOOLS_IMAGE="${EPOCHCLOUD_REGISTRY_HOST}/ghcr/epochhq/ci-tools-build:${EPOCHCLOUD_CI_TOOLS_TAG}"
+
+# Push target: the grey-cloud registry-push host on :5443, bypassing Cloudflare's
+# ~100MB body cap on large layer uploads (CI_TOOLS_IMAGE above keeps the proxied
+# host; pulls are never capped). Derived from the registry host
+# (registry.<domain> -> registry-push.<domain>:5443) unless EPOCHCLOUD_PUSH_HOST
+# overrides it.
+PUSH_REGISTRY="${EPOCHCLOUD_PUSH_HOST:-registry-push.${EPOCHCLOUD_REGISTRY_HOST#registry.}:5443}"
+
+echo "Building dev image ${EPOCHCLOUD_REGISTRY_HOST}/epochcloud/${IMAGE_BASE}-dev (commit ${COMMIT_SHA:0:7}) via ${CI_TOOLS_IMAGE}"
+
+# Mint the keyless-signing token via the OAuth2 device-authorization grant: the
+# ci-tools container prints a verification URL + code to stderr (visible here),
+# waits for browser approval, and emits the access token on stdout (captured
+# here). The token is held in a shell variable and handed to the build container
+# via SIGSTORE_IDENTITY_TOKEN (never argv, never disk). The cosign-dev client is
+# public, so no client secret is involved. Authorize in your browser when
+# prompted; the token is short-lived, so a very long cold build may need a re-run.
+echo "Authorize the build in your browser when prompted (realm: ${TENANT})..."
+SIGSTORE_IDENTITY_TOKEN="$(podman run --rm \
+    --entrypoint /ci-tools \
+    "$CI_TOOLS_IMAGE" \
+    keycloak device-login \
+    --keycloak-url "$OIDC_ISSUER" \
+    --client-id cosign-dev)"
+export SIGSTORE_IDENTITY_TOKEN
+[[ -n "$SIGSTORE_IDENTITY_TOKEN" ]] || { echo "device-login produced no token" >&2; exit 1; }
+
+# Flow creds + the identity token to the build container as env vars (never
+# argv): the names ci-tools build-local reads. The build runs inside a container
+# on the podman-machine Linux VM (buildah needs a Linux kernel). --privileged
+# lets rootless buildah mount its overlay graph, the same posture the in-cluster
+# buildah step uses. The build context is bind-mounted read-only at /src.
+# build-local cross-builds linux/amd64, keyless signs + attests, and pushes the
+# consumable :latest + :<short-sha> tags; the full commit SHA is stamped as the
+# org.opencontainers.image.revision OCI label for the dev Warehouse. The keyless
+# endpoints are the PUBLIC dev ingress; the OIDC issuer is the dev's tenant realm.
+export REGISTRY_PASSWORD="$HARBOR_DEV_ROBOT_TOKEN"
+
+exec podman run --rm --privileged \
+    -e REGISTRY_USERNAME="$HARBOR_DEV_ROBOT_USER" \
+    -e REGISTRY_PASSWORD \
+    -e SIGSTORE_IDENTITY_TOKEN \
+    -v "${BUILD_CONTEXT_ABS}:/src:ro" \
+    --entrypoint /ci-tools \
+    "$CI_TOOLS_IMAGE" \
+    build-local \
+    --image-name "$IMAGE_BASE" \
+    --commit-sha "$COMMIT_SHA" \
+    --registry "$PUSH_REGISTRY" \
+    --dockerfile "$DOCKERFILE" \
+    --context /src \
+    --platform linux/amd64 \
+    --builder-id "https://epoch.engineering/mac-builder@v1" \
+    --fulcio-url "$FULCIO_URL" \
+    --rekor-url "$REKOR_URL" \
+    --tsa-url "$TSA_URL" \
+    --tuf-mirror-url "$TUF_MIRROR_URL" \
+    --oidc-issuer "$OIDC_ISSUER" \
+    --repo-url "$REPO_URL" \
+    --repo-owner "$REPO_OWNER" \
+    --repo-name "$REPO_NAME" \
+    --branch "$BRANCH"
