@@ -5,7 +5,7 @@
 # builds THIS app's dev image on the dev machine and pushes it to the Harbor
 # `epochcloud/<image>-dev` repo, which the dev Kargo Warehouse discovers and
 # auto-promotes to the dev Stage (the image-verification policy admits it
-# per-tenant). `build` and `dev` are reserved for LOCAL build/run; `deploy` is
+# per-tenant). `pnpm build` and `pnpm dev` are for LOCAL build/run; `deploy` is
 # the only command that ships an image.
 #
 # It carries NO build logic: it runs the PUBLISHED slim ci-tools-build image

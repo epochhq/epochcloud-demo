@@ -125,7 +125,7 @@ Without direnv, enter the shell directly with `nix develop`, or fall back to
 `deploy` is the only command that ships an image. It builds this app's dev image
 on your machine, keyless-signs and SLSA-attests it, and pushes it to
 `epochcloud/<image>-dev`; the dev Kargo Warehouse auto-promotes it to the dev
-Stage. `build` and `dev` are local-only and never deploy.
+Stage. `pnpm build` and `pnpm dev` are local-only and never deploy.
 
 ```bash
 deploy            # build + sign + push the dev image
