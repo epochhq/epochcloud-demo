@@ -1,0 +1,14 @@
+# Keep the build context lean and reproducible. node_modules / .svelte-kit /
+# build are regenerated inside the image; copying a local copy in poisons
+# pnpm's deps-status check (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY) and
+# bloats the context.
+#
+# NOTE: .git is intentionally NOT ignored - vite.config.ts reads the build
+# commit from it via `git rev-parse` at `vite build` time. Excluding it would
+# silently degrade the commit to "unknown".
+node_modules
+.svelte-kit
+build
+.env
+.env.*
+*.log

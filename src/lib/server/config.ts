@@ -1,11 +1,14 @@
 import { env } from '$env/dynamic/private';
-import { env as publicEnv } from '$env/dynamic/public';
 
 export const config = {
-	// Build info (injected at build time)
-	version: publicEnv.PUBLIC_VERSION || 'dev',
-	commit: publicEnv.PUBLIC_COMMIT || 'unknown',
-	buildTime: publicEnv.PUBLIC_BUILD_TIME || 'unknown',
+	// Build info - stamped at `vite build` time via the `define` constants in
+	// vite.config.ts (version from the VERSION file, commit from git, build
+	// timestamp from the build moment). NOT injected via Docker --build-arg:
+	// the buildah pipeline passes none, so the old PUBLIC_* env path always
+	// read dev / unknown / unknown.
+	version: __APP_VERSION__,
+	commit: __APP_COMMIT__,
+	buildTime: __APP_BUILD_TIME__,
 
 	// Runtime
 	environment: env.ENVIRONMENT || 'dev',
