@@ -106,12 +106,36 @@ Build-time variables (injected via Dockerfile ARGs → `PUBLIC_*` env):
 
 ## Local Development
 
+The repo uses a Nix flake + direnv devShell. With direnv allowed, the toolchain
+lands on `PATH` and dependencies install automatically:
+
 ```bash
-npm install
-npm run dev
+direnv allow   # first time; runs `pnpm install` and puts `deploy` on PATH
+pnpm dev       # local SvelteKit dev server (vite dev)
+pnpm build     # local production build (vite build)
 ```
 
 Open <http://localhost:3000> - most features will show as disabled without the backing services.
+
+Without direnv, enter the shell directly with `nix develop`, or fall back to
+`pnpm install && pnpm dev`.
+
+## Deploy
+
+`deploy` is the only command that ships an image. It builds this app's dev image
+on your machine, keyless-signs and SLSA-attests it, and pushes it to
+`epochcloud/<image>-dev`; the dev Kargo Warehouse auto-promotes it to the dev
+Stage. `build` and `dev` are local-only and never deploy.
+
+```bash
+deploy            # build + sign + push the dev image
+deploy --help     # required env, credentials, options
+```
+
+It needs only podman (with a running `podman machine`), a Harbor robot scoped to
+push `epochcloud/*-dev`, and a dev-user in your tenant Keycloak realm for the
+in-browser signing approval - no cosign key, no SOPS, no cluster access. Copy
+`.env.example` to `.env` (gitignored; direnv loads it) and fill in the credentials.
 
 ## API Routes
 
