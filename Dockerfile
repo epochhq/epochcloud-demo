@@ -1,6 +1,13 @@
 # Build stage
 FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea AS builder
 
+# git is needed by `vite build`: vite.config.ts stamps the build commit from the
+# checked-out .git via `git rev-parse`. Stamping the commit through git (not a
+# Docker --build-arg) keeps it out of every layer's cache key - a per-commit
+# build-arg value would force a permanent cold dependency rebuild. node:alpine
+# ships no git, so install it here (builder stage only; the runtime stage stays slim).
+RUN apk --no-cache add git
+
 WORKDIR /app
 
 # Copy package files. pnpm-workspace.yaml is required for pnpm 11+ -
@@ -26,18 +33,12 @@ RUN npm install -g --force "pnpm@$(node -p "require('./package.json').packageMan
 # Install dependencies (no --frozen-lockfile: survives Renovate lockfile lag between packageManager bumps)
 RUN pnpm install
 
-# Copy source
+# Copy source (includes .git, which `vite build` reads for the build commit).
 COPY . .
 
-# Build with version info
-ARG VERSION=dev
-ARG COMMIT=unknown
-ARG BUILD_TIME=unknown
-
-ENV PUBLIC_VERSION=${VERSION}
-ENV PUBLIC_COMMIT=${COMMIT}
-ENV PUBLIC_BUILD_TIME=${BUILD_TIME}
-
+# Build. version / commit / build-time are stamped here by vite.config.ts's
+# `define` (VERSION file + `git rev-parse` + build timestamp), NOT via
+# --build-arg - see the git note in the builder stage above.
 RUN pnpm build
 
 # Prune dev dependencies
@@ -48,14 +49,6 @@ FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359ef
 
 # Install ca-certificates for HTTPS
 RUN apk --no-cache add ca-certificates
-
-# Build info - propagated from builder stage for $env/dynamic/public
-ARG VERSION=dev
-ARG COMMIT=unknown
-ARG BUILD_TIME=unknown
-ENV PUBLIC_VERSION=${VERSION}
-ENV PUBLIC_COMMIT=${COMMIT}
-ENV PUBLIC_BUILD_TIME=${BUILD_TIME}
 
 WORKDIR /app
 

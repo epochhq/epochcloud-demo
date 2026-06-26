@@ -35,6 +35,10 @@ export default [
         performance: "readonly",
         window: "readonly",
         document: "readonly",
+        // Build metadata constants injected by Vite `define` (see vite.config.ts).
+        __APP_VERSION__: "readonly",
+        __APP_COMMIT__: "readonly",
+        __APP_BUILD_TIME__: "readonly",
       },
     },
   },

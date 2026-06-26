@@ -100,9 +100,12 @@ epochcloud/
 | `RYBBIT_SITE_ID` | | Rybbit analytics site ID |
 | `RYBBIT_HOST` | | Rybbit analytics host |
 
-Build-time variables (injected via Dockerfile ARGs → `PUBLIC_*` env):
-
-- `PUBLIC_VERSION`, `PUBLIC_COMMIT`, `PUBLIC_BUILD_TIME`
+Build metadata (version / commit / build time) is stamped at `vite build` time
+by `vite.config.ts` (`define`): the version comes from the `VERSION` file, the
+commit from `git rev-parse`, and the build time from the build moment. It is NOT
+passed via Docker `--build-arg` - the in-cluster buildah pipeline passes none,
+because a per-build arg value busts every layer's cache key and forces a cold
+dependency rebuild.
 
 ## Local Development
 
