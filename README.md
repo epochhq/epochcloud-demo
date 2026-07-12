@@ -74,6 +74,33 @@ epochcloud/
 └── ...
 ```
 
+## Deploy to dev
+
+`deploy` (on PATH in the devshell) is the only command that ships an image;
+`pnpm build` / `pnpm dev` are local-only. It builds your WORKING TREE
+(uncommitted changes included), keyless-signs it as YOUR identity, and pushes
+the dev image. No platform checkout, no SOPS, no kubeconfig.
+
+```bash
+deploy
+```
+
+What happens:
+
+1. The command prints an authorization URL + code in your terminal and waits
+   (up to 10 minutes). Open the URL, choose **Sign in via EpochHQ**, approve,
+   and return to the terminal. With a live SSO session it is one click; an
+   expired code is harmless - re-run `deploy`.
+2. Hands-off from there: the image builds from your working tree, gets a
+   keyless signature and a SLSA provenance attestation bound to your verified
+   email under this product's realm, and pushes to the Harbor dev repo.
+3. The dev Kargo Warehouse discovers the new digest and auto-promotes it to
+   the dev Stage. Pushing IS the deploy - there is no separate step.
+
+One-time setup: a running `podman machine` and the scoped Harbor push
+credentials in a gitignored `.env` (see `.env.example`). The full signing
+model is documented in the epochcloud repo: keyless-signing.md.
+
 ## Environment Variables
 
 | Variable | Default | Description |
