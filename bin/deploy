@@ -94,11 +94,13 @@ REPO_OWNER="$(printf '%s' "$REPO_URL" | sed -E 's#.*[:/]([^/]+)/[^/]+(\.git)?$#\
 
 # Keyless signing endpoints + the tenant OIDC issuer, DERIVED from the Harbor
 # host (registry.<domain> -> <domain>), never hardcoded. The signing identity is
-# the dev's tenant realm; the tenant slug defaults to the git remote owner (the
-# tenant that owns this app repo), overridable via EPOCHCLOUD_SIGNING_TENANT. The
-# endpoints are the PUBLIC dev ingress (a dev Mac is outside the cluster).
+# the PRODUCT's own realm: an image's home realm is its signing realm, and the
+# product realm slug is the repo name (the admission policy for this product's
+# -dev images pins exactly that issuer, so an org-realm token signs a cert the
+# cluster rejects). Overridable via EPOCHCLOUD_SIGNING_TENANT. The endpoints are
+# the PUBLIC dev ingress (a dev Mac is outside the cluster).
 DOMAIN="${EPOCHCLOUD_REGISTRY_HOST#registry.}"
-TENANT="${EPOCHCLOUD_SIGNING_TENANT:-$REPO_OWNER}"
+TENANT="${EPOCHCLOUD_SIGNING_TENANT:-$REPO_NAME}"
 OIDC_ISSUER="https://auth.${DOMAIN}/realms/${TENANT}"
 FULCIO_URL="https://fulcio.${DOMAIN}"
 REKOR_URL="https://rekor.${DOMAIN}"
@@ -125,24 +127,38 @@ PUSH_REGISTRY="${EPOCHCLOUD_PUSH_HOST:-registry-push.${EPOCHCLOUD_REGISTRY_HOST#
 
 echo "Building dev image ${EPOCHCLOUD_REGISTRY_HOST}/epochcloud/${IMAGE_BASE}-dev (commit ${COMMIT_SHA:0:7}) via ${CI_TOOLS_IMAGE}"
 
-# Mint the keyless-signing token via the OAuth2 device-authorization grant: the
+# Mint the keyless-signing identity via the OAuth2 device-authorization grant: the
 # ci-tools container prints a verification URL + code to stderr (visible here),
-# waits for browser approval, and emits the access token on stdout (captured
-# here). The token is held in a shell variable and handed to the build container
-# via SIGSTORE_IDENTITY_TOKEN (never argv, never disk). The cosign-dev client is
-# public, so no client secret is involved. Authorize in your browser when
-# prompted; the token is short-lived, so a very long cold build may need a re-run.
-echo "Authorize the build in your browser when prompted (realm: ${TENANT})..."
-SIGSTORE_IDENTITY_TOKEN="$(podman run --rm \
+# waits for browser approval, and emits the REFRESH token on stdout (captured
+# here).
+#
+# The REFRESH token, not the access token, is what crosses into the build. A build
+# signs AFTER it compiles, and a cold cross-build runs far longer than any access
+# token lives, so an access token minted here is already dead when cosign reaches
+# Fulcio - which discards a finished, pushed image at its final step. The build
+# container instead holds the refresh token, keeps the approved session alive while
+# it builds, and mints its own access token at the moment it signs.
+#
+# The token is held in a shell variable and handed to the build container via
+# SIGSTORE_REFRESH_TOKEN (never argv, never disk). The cosign-dev client is public,
+# so no client secret is involved.
+echo "Authorize the build in your browser when prompted (realm: ${TENANT}), then leave it:"
+echo "the build keeps that session alive and signs itself, however long it takes."
+# --pull=newer: the :latest ci-tools-build tag moves on every publish, and
+# podman's default pull policy (missing) would silently keep a stale local
+# image forever once one has been pulled.
+SIGSTORE_REFRESH_TOKEN="$(podman run --rm --pull=newer \
     --entrypoint /ci-tools \
     "$CI_TOOLS_IMAGE" \
     keycloak device-login \
     --keycloak-url "$OIDC_ISSUER" \
-    --client-id cosign-dev)"
-export SIGSTORE_IDENTITY_TOKEN
-[[ -n "$SIGSTORE_IDENTITY_TOKEN" ]] || { echo "device-login produced no token" >&2; exit 1; }
+    --client-id cosign-dev \
+    --emit refresh \
+    --timeout 10m)"
+export SIGSTORE_REFRESH_TOKEN
+[[ -n "$SIGSTORE_REFRESH_TOKEN" ]] || { echo "device-login produced no refresh token" >&2; exit 1; }
 
-# Flow creds + the identity token to the build container as env vars (never
+# Flow creds + the signing identity to the build container as env vars (never
 # argv): the names ci-tools build-local reads. The build runs inside a container
 # on the podman-machine Linux VM (buildah needs a Linux kernel). --privileged
 # lets rootless buildah mount its overlay graph, the same posture the in-cluster
@@ -150,14 +166,21 @@ export SIGSTORE_IDENTITY_TOKEN
 # build-local cross-builds linux/amd64, keyless signs + attests, and pushes the
 # consumable :latest + :<short-sha> tags; the full commit SHA is stamped as the
 # org.opencontainers.image.revision OCI label for the dev Warehouse. The keyless
-# endpoints are the PUBLIC dev ingress; the OIDC issuer is the dev's tenant realm.
+# endpoints are the PUBLIC dev ingress; the OIDC issuer is the signing realm, which
+# is also the realm the identity is refreshed at.
 export REGISTRY_PASSWORD="$HARBOR_DEV_ROBOT_TOKEN"
 
-exec podman run --rm --privileged \
+# The buildah layer graph lives on a named podman volume so the step cache
+# survives across deploys: an unchanged Dockerfile step is a cache hit, and a
+# rebuild recompiles only what changed. Reclaim with
+#   podman volume rm epochcloud-buildah-cache
+# when disk matters more than the next build's speed.
+exec podman run --rm --pull=newer --privileged \
     -e REGISTRY_USERNAME="$HARBOR_DEV_ROBOT_USER" \
     -e REGISTRY_PASSWORD \
-    -e SIGSTORE_IDENTITY_TOKEN \
+    -e SIGSTORE_REFRESH_TOKEN \
     -v "${BUILD_CONTEXT_ABS}:/src:ro" \
+    -v epochcloud-buildah-cache:/var/cache/epochcloud-buildah \
     --entrypoint /ci-tools \
     "$CI_TOOLS_IMAGE" \
     build-local \
@@ -166,6 +189,7 @@ exec podman run --rm --privileged \
     --registry "$PUSH_REGISTRY" \
     --dockerfile "$DOCKERFILE" \
     --context /src \
+    --storage-root /var/cache/epochcloud-buildah \
     --platform linux/amd64 \
     --builder-id "https://epoch.engineering/mac-builder@v1" \
     --fulcio-url "$FULCIO_URL" \
@@ -173,6 +197,7 @@ exec podman run --rm --privileged \
     --tsa-url "$TSA_URL" \
     --tuf-mirror-url "$TUF_MIRROR_URL" \
     --oidc-issuer "$OIDC_ISSUER" \
+    --oidc-client-id cosign-dev \
     --repo-url "$REPO_URL" \
     --repo-owner "$REPO_OWNER" \
     --repo-name "$REPO_NAME" \
