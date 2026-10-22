@@ -19,21 +19,18 @@ export const GET: RequestHandler = async ({ url }) => {
 	}
 
 	try {
-		const resp = await fetch(
-			`${config.gofeatureflag.url}/v1/feature/${encodeURIComponent(flagName)}/eval`,
-			{
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					evaluationContext: {
-						targetingKey: userId,
-						environment: config.environment
-					},
-					defaultValue: false
-				}),
-				signal: AbortSignal.timeout(5000)
-			}
-		);
+		const resp = await fetch(`${config.gofeatureflag.url}/v1/feature/${encodeURIComponent(flagName)}/eval`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				evaluationContext: {
+					targetingKey: userId,
+					environment: config.environment
+				},
+				defaultValue: false
+			}),
+			signal: AbortSignal.timeout(5000)
+		});
 
 		const result = await resp.json();
 

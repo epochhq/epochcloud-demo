@@ -112,7 +112,10 @@
 	</div>
 	<p class="card-desc">mTLS proxy - inbound from meshed services, outbound to meshed services</p>
 	<div class="linkerd-controls">
-		<button onclick={loadLinkerdStats} class="btn btn-outline btn-sm">Refresh</button>
+		<button
+			onclick={loadLinkerdStats}
+			class="btn btn-outline btn-sm">Refresh</button
+		>
 		<button
 			onclick={linkerdGenerateTraffic}
 			class="btn btn-accent btn-sm"
@@ -139,9 +142,7 @@
 				{#each [{ dir: 'Outbound', hint: 'this pod → services', data: linkerdData.outbound, tcp: linkerdData.tcp_out, rate: linkerdRates?.outbound ?? 0 }, { dir: 'Inbound', hint: 'services → this pod', data: linkerdData.inbound, tcp: linkerdData.tcp_in, rate: linkerdRates?.inbound ?? 0 }] as section (section.dir)}
 					<div class="linkerd-dir">
 						<div class="linkerd-dir-top">
-							<span class="linkerd-dir-label"
-								>{section.dir} <span class="linkerd-dir-hint">{section.hint}</span></span
-							>
+							<span class="linkerd-dir-label">{section.dir} <span class="linkerd-dir-hint">{section.hint}</span></span>
 							{#if section.rate > 0}
 								<span class="linkerd-rate">+{section.rate}/3s</span>
 							{/if}
@@ -150,16 +151,11 @@
 							<div class="linkerd-success-bar">
 								<div
 									class="linkerd-success-fill"
-									style="width: {section.data.requests > 0
-										? (section.data.success / section.data.requests) * 100
-										: 100}%"
+									style="width: {section.data.requests > 0 ? (section.data.success / section.data.requests) * 100 : 100}%"
 								></div>
 							</div>
 							<span class="linkerd-success-text"
-								>{(section.data.requests > 0
-									? (section.data.success / section.data.requests) * 100
-									: 100
-								).toFixed(1)}% success rate</span
+								>{(section.data.requests > 0 ? (section.data.success / section.data.requests) * 100 : 100).toFixed(1)}% success rate</span
 							>
 						{/if}
 						<div class="linkerd-stats">
@@ -172,8 +168,9 @@
 								<span class="linkerd-stat-label">Success</span>
 							</div>
 							<div class="linkerd-stat">
-								<span class="linkerd-val" class:linkerd-val-err={section.data.failures > 0}
-									>{section.data.failures.toLocaleString()}</span
+								<span
+									class="linkerd-val"
+									class:linkerd-val-err={section.data.failures > 0}>{section.data.failures.toLocaleString()}</span
 								>
 								<span class="linkerd-stat-label">Failures</span>
 							</div>
@@ -188,9 +185,7 @@
 			<div class="prom-meta">
 				<span class="prom-meta-item">Proxy Memory: {linkerdData.memory_mb} MB</span>
 				<span class="prom-meta-item">mTLS: Active</span>
-				<span class="prom-meta-item"
-					>Updated: {linkerdLastUpdated}{linkerdAgo > 0 ? ` (${linkerdAgo}s ago)` : ''}</span
-				>
+				<span class="prom-meta-item">Updated: {linkerdLastUpdated}{linkerdAgo > 0 ? ` (${linkerdAgo}s ago)` : ''}</span>
 			</div>
 		{:else}
 			<pre class="result-pre err">{linkerdError}</pre>

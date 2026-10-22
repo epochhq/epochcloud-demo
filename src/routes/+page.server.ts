@@ -12,9 +12,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		environment: config.environment,
 		startedAt: config.startedAt,
 		consumerMode: config.consumerMode,
-		rybbit: config.rybbit.enabled
-			? { siteId: config.rybbit.siteId, host: config.rybbit.host }
-			: null,
+		rybbit: config.rybbit.enabled ? { siteId: config.rybbit.siteId, host: config.rybbit.host } : null,
 		features: {
 			rabbitmq: config.rabbitmq.enabled,
 			valkey: config.valkey.enabled,

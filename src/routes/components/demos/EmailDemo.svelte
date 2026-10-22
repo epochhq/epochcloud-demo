@@ -34,10 +34,19 @@
 				placeholder="recipient@example.com"
 				class="input"
 			/>
-			<button onclick={sendEmail} class="btn btn-primary btn-sm">Send</button>
+			<button
+				onclick={sendEmail}
+				class="btn btn-primary btn-sm">Send</button
+			>
 		</div>
 		{#if emailStatus}
-			<p class="result" class:ok={!emailError} class:err={emailError}>{emailStatus}</p>
+			<p
+				class="result"
+				class:ok={!emailError}
+				class:err={emailError}
+			>
+				{emailStatus}
+			</p>
 		{/if}
 	{:else}
 		<p class="disabled-msg">Not configured - SMTP_HOST not set</p>

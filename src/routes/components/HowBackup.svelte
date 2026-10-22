@@ -18,26 +18,24 @@
 		{ name: 'Kanister', sub: 'recovery-drill verification', cadence: 'weekly' }
 	];
 
-	const retention = [
-		'Longhorn snapshots: 30 min',
-		'Tier-2 daily: 7 days',
-		'Weekly + secrets: 30 days',
-		'Continuous WAL: point-in-time'
-	];
+	const retention = ['Longhorn snapshots: 30 min', 'Tier-2 daily: 7 days', 'Weekly + secrets: 30 days', 'Continuous WAL: point-in-time'];
 
-	const monitors = [
-		'cnpg-witness',
-		'velero-watcher',
-		'sentinel-freshness',
-		'drill-result-exporter'
-	];
+	const monitors = ['cnpg-witness', 'velero-watcher', 'sentinel-freshness', 'drill-result-exporter'];
 </script>
 
-<FlowCard title="How Data Is Protected" badge="Backup + restore" gap="1rem">
+<FlowCard
+	title="How Data Is Protected"
+	badge="Backup + restore"
+	gap="1rem"
+>
 	<div class="bk-flow">
 		<div class="bk-sources">
 			{#each sources as source (source.name)}
-				<FlowNode label={source.name} sub={source.sub} accent="blue">
+				<FlowNode
+					label={source.name}
+					sub={source.sub}
+					accent="blue"
+				>
 					{#snippet extra()}
 						<span class="bk-cadence">{source.cadence}</span>
 					{/snippet}
@@ -48,13 +46,22 @@
 		<FlowArrow />
 
 		<div class="bk-store">
-			<FlowNode label="SeaweedFS S3" sub="object storage" accent="amber" emphasis />
+			<FlowNode
+				label="SeaweedFS S3"
+				sub="object storage"
+				accent="amber"
+				emphasis
+			/>
 		</div>
 
 		<FlowArrow />
 
 		<div class="bk-restore">
-			<FlowNode label="Restore" sub="drill-verified recovery" accent="green">
+			<FlowNode
+				label="Restore"
+				sub="drill-verified recovery"
+				accent="green"
+			>
 				{#snippet extra()}
 					<div class="bk-retention">
 						{#each retention as line (line)}
@@ -76,9 +83,8 @@
 	</div>
 
 	{#snippet note()}
-		Four independent sources back up to one S3 store. A monitor layer writes per-backup sentinels
-		and tracks freshness, and Kanister exercises the full restore path on a schedule, so recovery is
-		tested, not assumed.
+		Four independent sources back up to one S3 store. A monitor layer writes per-backup sentinels and tracks freshness, and Kanister exercises the full restore
+		path on a schedule, so recovery is tested, not assumed.
 	{/snippet}
 </FlowCard>
 

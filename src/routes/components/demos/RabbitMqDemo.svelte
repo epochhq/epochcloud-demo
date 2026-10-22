@@ -32,9 +32,7 @@
 
 		for (let i = 0; i < count; i++) {
 			try {
-				const params = msg
-					? `?message=${encodeURIComponent(msg + (count > 1 ? ` #${i + 1}` : ''))}`
-					: '';
+				const params = msg ? `?message=${encodeURIComponent(msg + (count > 1 ? ` #${i + 1}` : ''))}` : '';
 				const resp = await fetch(`/rabbitmq/publish${params}`);
 				const d = await resp.json();
 				if (!d.success) results.push(`#${i + 1}: ${d.error}`);
@@ -80,8 +78,14 @@
 		<span class="card-tag">Message Queue</span>
 	</div>
 	<div class="status-row">
-		<button onclick={checkStatus} class="btn btn-outline btn-sm">Check Status</button>
-		<StatusIcon ok={statusOk} checked={statusText !== 'Not checked'} />
+		<button
+			onclick={checkStatus}
+			class="btn btn-outline btn-sm">Check Status</button
+		>
+		<StatusIcon
+			ok={statusOk}
+			checked={statusText !== 'Not checked'}
+		/>
 		<span class="status-text">{statusText}</span>
 	</div>
 	{#if enabled}
@@ -90,7 +94,12 @@
 				<span class="form-label">Publish</span>
 				<div class="input-row">
 					<span class="input-label">Message</span>
-					<input type="text" bind:value={message} placeholder="optional" class="input" />
+					<input
+						type="text"
+						bind:value={message}
+						placeholder="optional"
+						class="input"
+					/>
 				</div>
 				<div class="input-row">
 					<span class="input-label">Count</span>
@@ -103,15 +112,27 @@
 						style="max-width:70px"
 					/>
 				</div>
-				<button onclick={publish} class="btn btn-primary btn-sm w-full">Publish</button>
+				<button
+					onclick={publish}
+					class="btn btn-primary btn-sm w-full">Publish</button
+				>
 			</div>
 			<div class="form-col">
 				<span class="form-label">Consume</span>
-				<button onclick={consume} class="btn btn-outline btn-sm w-full">Check Buffer</button>
+				<button
+					onclick={consume}
+					class="btn btn-outline btn-sm w-full">Check Buffer</button
+				>
 			</div>
 		</div>
 		{#if resultVisible}
-			<p class="result" class:ok={resultOk} class:err={!resultOk}>{result}</p>
+			<p
+				class="result"
+				class:ok={resultOk}
+				class:err={!resultOk}
+			>
+				{result}
+			</p>
 		{/if}
 		{#if consumed.length > 0}
 			<div class="consumed-list">

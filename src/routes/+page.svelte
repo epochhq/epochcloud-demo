@@ -60,7 +60,10 @@
 </svelte:head>
 
 <div class="dashboard">
-	<Header environment={data.environment} domain={data.domain} />
+	<Header
+		environment={data.environment}
+		domain={data.domain}
+	/>
 	<BuildBar
 		version={data.version}
 		commit={data.commit}
@@ -81,14 +84,21 @@
 			<span class="count-badge">13</span>
 		</div>
 
-		<DemoTabs {activeDemo} {statuses} onSelect={(id) => (activeDemo = id)} />
+		<DemoTabs
+			{activeDemo}
+			{statuses}
+			onSelect={(id) => (activeDemo = id)}
+		/>
 
 		{#if activeDemo === 'rabbitmq'}
 			<RabbitMqDemo enabled={data.features.rabbitmq} />
 		{:else if activeDemo === 'valkey'}
 			<ValkeyDemo enabled={data.features.valkey} />
 		{:else if activeDemo === 'cnpg'}
-			<CnpgDemo enabled={data.features.cnpg} environment={data.environment} />
+			<CnpgDemo
+				enabled={data.features.cnpg}
+				environment={data.environment}
+			/>
 		{:else if activeDemo === 'email'}
 			<EmailDemo enabled={data.features.smtp} />
 		{:else if activeDemo === 'betterauth'}
@@ -96,7 +106,10 @@
 		{:else if activeDemo === 'crowdsec'}
 			<CrowdSecDemo enabled={data.features.crowdsec} />
 		{:else if activeDemo === 'defectdojo'}
-			<DefectDojoDemo enabled={data.features.defectdojo} domain={data.domain} />
+			<DefectDojoDemo
+				enabled={data.features.defectdojo}
+				domain={data.domain}
+			/>
 		{:else if activeDemo === 'prometheus'}
 			<PrometheusDemo />
 		{:else if activeDemo === 'linkerd'}

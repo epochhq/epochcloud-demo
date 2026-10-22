@@ -123,9 +123,7 @@ export async function listItems(): Promise<CnpgItem[]> {
 	if (!pool) throw new Error('CNPG not connected');
 	await ensureSchemaIfNeeded();
 	cnpgOperations.inc({ op: 'list' });
-	const r = await pool.query<CnpgItem>(
-		'SELECT id, text, originated_in, created_at FROM demo_items ORDER BY id DESC LIMIT 100'
-	);
+	const r = await pool.query<CnpgItem>('SELECT id, text, originated_in, created_at FROM demo_items ORDER BY id DESC LIMIT 100');
 	return r.rows;
 }
 
@@ -133,10 +131,10 @@ export async function createItem(text: string): Promise<CnpgItem> {
 	if (!pool) throw new Error('CNPG not connected');
 	await ensureSchemaIfNeeded();
 	cnpgOperations.inc({ op: 'create' });
-	const r = await pool.query<CnpgItem>(
-		'INSERT INTO demo_items (text, originated_in) VALUES ($1, $2) RETURNING id, text, originated_in, created_at',
-		[text, config.environment]
-	);
+	const r = await pool.query<CnpgItem>('INSERT INTO demo_items (text, originated_in) VALUES ($1, $2) RETURNING id, text, originated_in, created_at', [
+		text,
+		config.environment
+	]);
 	const row = r.rows[0];
 	if (!row) throw new Error('INSERT ... RETURNING produced no row');
 	return row;

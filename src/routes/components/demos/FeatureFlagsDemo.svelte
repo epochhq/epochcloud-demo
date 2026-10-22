@@ -18,8 +18,7 @@
 	}
 
 	let evalResult: FfEvalResult | null = $state(null);
-	let allFlags: Record<string, { value: unknown; variationType?: string; reason?: string }> | null =
-		$state(null);
+	let allFlags: Record<string, { value: unknown; variationType?: string; reason?: string }> | null = $state(null);
 	let allUser = $state('user-456');
 	let error = $state('');
 
@@ -29,9 +28,7 @@
 			const resp = await fetch('/features/status');
 			const d = await resp.json();
 			statusOk = d.connected;
-			statusText = d.connected
-				? `Connected - ${d.flags_available || 0} flags`
-				: `Disconnected${d.error ? ' - ' + d.error : ''}`;
+			statusText = d.connected ? `Connected - ${d.flags_available || 0} flags` : `Disconnected${d.error ? ' - ' + d.error : ''}`;
 		} catch (err) {
 			statusText = `Error: ${err}`;
 			statusOk = false;
@@ -42,9 +39,7 @@
 		error = '';
 		evalResult = null;
 		try {
-			const resp = await fetch(
-				`/features/evaluate?flag=${encodeURIComponent(flagName)}&user=${encodeURIComponent(userId)}`
-			);
+			const resp = await fetch(`/features/evaluate?flag=${encodeURIComponent(flagName)}&user=${encodeURIComponent(userId)}`);
 			const d = await resp.json();
 			if (d.error) {
 				error = d.error;
@@ -83,22 +78,36 @@
 		<span class="card-tag">GO Feature Flag</span>
 	</div>
 	<div class="status-row">
-		<button onclick={checkStatus} class="btn btn-outline btn-sm">Check Status</button>
-		<StatusIcon ok={statusOk} checked={statusText !== 'Not checked'} />
+		<button
+			onclick={checkStatus}
+			class="btn btn-outline btn-sm">Check Status</button
+		>
+		<StatusIcon
+			ok={statusOk}
+			checked={statusText !== 'Not checked'}
+		/>
 		<span class="status-text">{statusText}</span>
 	</div>
 	{#if enabled}
 		<div class="ff-sections">
 			<div class="ff-section">
 				<span class="form-label">Evaluate Flag</span>
-				<select bind:value={flagName} class="input">
+				<select
+					bind:value={flagName}
+					class="input"
+				>
 					<option value="maintenance-mode">maintenance-mode</option>
 					<option value="new-dashboard-layout">new-dashboard-layout</option>
 					<option value="dark-mode">dark-mode</option>
 					<option value="welcome-banner">welcome-banner</option>
 				</select>
 				<div class="ff-user-row">
-					<input type="text" bind:value={userId} placeholder="User ID" class="input" />
+					<input
+						type="text"
+						bind:value={userId}
+						placeholder="User ID"
+						class="input"
+					/>
 					<div class="ff-user-presets">
 						{#each ['user-123', 'admin', 'beta-tester', 'anonymous'] as preset (preset)}
 							<button
@@ -109,7 +118,10 @@
 						{/each}
 					</div>
 				</div>
-				<button onclick={evaluate} class="btn btn-primary btn-sm w-full">Evaluate</button>
+				<button
+					onclick={evaluate}
+					class="btn btn-primary btn-sm w-full">Evaluate</button
+				>
 				{#if evalResult}
 					<div class="ff-result-card">
 						<div class="ff-result-header">
@@ -139,7 +151,12 @@
 			<div class="ff-section">
 				<span class="form-label">All Flags</span>
 				<div class="ff-user-row">
-					<input type="text" bind:value={allUser} placeholder="User ID" class="input" />
+					<input
+						type="text"
+						bind:value={allUser}
+						placeholder="User ID"
+						class="input"
+					/>
 					<div class="ff-user-presets">
 						{#each ['user-456', 'admin', 'new-user'] as preset (preset)}
 							<button
@@ -150,7 +167,10 @@
 						{/each}
 					</div>
 				</div>
-				<button onclick={evalAll} class="btn btn-secondary btn-sm w-full">Evaluate All</button>
+				<button
+					onclick={evalAll}
+					class="btn btn-secondary btn-sm w-full">Evaluate All</button
+				>
 				{#if allFlags}
 					<div class="ff-flags-table">
 						{#each Object.entries(allFlags) as [name, flag] (name)}

@@ -1,12 +1,7 @@
 import amqplib, { type ChannelModel, type ConfirmChannel } from 'amqplib';
 import { config } from './config.js';
 import { log } from './logger.js';
-import {
-	rabbitConnected,
-	rabbitMessagesPublished,
-	rabbitMessagesConsumed,
-	rabbitPublishErrors
-} from './metrics.js';
+import { rabbitConnected, rabbitMessagesPublished, rabbitMessagesConsumed, rabbitPublishErrors } from './metrics.js';
 
 let connection: ChannelModel | null = null;
 let channel: ConfirmChannel | null = null;

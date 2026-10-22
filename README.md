@@ -4,11 +4,11 @@ SvelteKit 5 demo app for the EpochCloud Kubernetes platform.
 
 ## Quick Links
 
-| 🌐 Live Sites                                    | 📦 Repos                                                     |
-| :----------------------------------------------- | :----------------------------------------------------------- |
+| 🌐 Live Sites                                    | 📦 Repos                                                      |
+| :----------------------------------------------- | :------------------------------------------------------------ |
 | [🧪 Demo (Prod)](https://demo.<your-domain>)     | [☁️ EpochCloud Infra](https://github.com/EpochBoy/epochcloud) |
-| [🔬 Staging](https://demo-staging.<your-domain>) |                                                              |
-| [🧑‍💻 Dev](https://demo-dev.<your-domain>)       |                                                              |
+| [🔬 Staging](https://demo-staging.<your-domain>) |                                                               |
+| [🧑‍💻 Dev](https://demo-dev.<your-domain>)         |                                                               |
 
 ## Purpose
 
@@ -32,7 +32,7 @@ SvelteKit 5 demo app for the EpochCloud Kubernetes platform.
 
 ```text
 epochcloud-demo/
-├── Dockerfile                    # Multi-stage Node.js build
+├── Dockerfile                    # Multi-stage frozen Bun build
 ├── package.json                  # Dependencies
 ├── svelte.config.js              # SvelteKit + adapter-node
 ├── vite.config.ts                # Vite config
@@ -80,7 +80,7 @@ epochcloud/
 ## Deploy to dev
 
 `deploy` (on PATH in the devshell) is the only command that ships an image;
-`pnpm build` / `pnpm dev` are local-only. It builds your WORKING TREE
+`bun run build` / `bun run dev` are local-only. It builds your WORKING TREE
 (uncommitted changes included), keyless-signs it as YOUR identity, and pushes
 the dev image. No platform checkout, no SOPS, no kubeconfig.
 
@@ -160,22 +160,46 @@ The repo uses a Nix flake + direnv devShell. With direnv allowed, the toolchain
 lands on `PATH` and dependencies install automatically:
 
 ```bash
-direnv allow   # first time; runs `pnpm install` and puts `deploy` on PATH
-pnpm dev       # local SvelteKit dev server (vite dev)
-pnpm build     # local production build (vite build)
+direnv allow         # installs from the frozen Bun lock and puts deploy on PATH
+bun run dev          # local Vite+ development server
+bun run check        # lint/format, native TypeScript, and Svelte diagnostics
+bun run test         # Vite+ server tests under Bun
+bun run build        # local production build
+bun run start        # serve the generated SvelteKit server with Bun
 ```
+
+The shell does not provision, resize or start a Podman machine. Publishing requires
+a separately running machine; local development and checks do not.
+
+The Bun and Node archives are normal Nix file inputs with integrity in `flake.lock`.
+Renovate updates their URLs and regenerates that lock through native Nix tasks.
+The managed updater must allow that Nix command; the EpochCloud runner config owns
+the permission. `bun run check` verifies the canonical runtime versions against all
+locked archives offline and refuses stale locks. Updates wait fourteen days, with
+exceptions only for the explicitly pinned Bun 1.4.4 and Node 24.22.1 security fixes.
+
+The production runtime is Bun using SvelteKit's existing adapter-node output.
+Its preload verifies the actual Bun version against `package.json` before loading
+the generated server, so changing only the container's runtime pin fails startup.
+Node 24 runs Vite+ development, builds, TypeScript/JavaScript lint and Svelte formatting.
+Server regression tests run Vite+ under Bun. Svelte component lint retains the existing ESLint rules because the
+target Vite+ linter does not enforce them; `bun run check` runs both scopes.
+TypeScript 7
+checks owned TypeScript through `tsc`; the official TypeScript 6 API alias is
+retained only for SvelteKit and svelte-check, which still use the JavaScript
+compiler API. [Microsoft documents this side-by-side arrangement](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-60).
 
 Open <http://localhost:3000> - most features will show as disabled without the backing services.
 
 Without direnv, enter the shell directly with `nix develop`, or fall back to
-`pnpm install && pnpm dev`.
+`bun install --frozen-lockfile && bun run dev`.
 
 ## Deploy
 
 `deploy` is the only command that ships an image. It builds this app's dev image
 on your machine, keyless-signs and SLSA-attests it, and pushes it to
 `epochcloud/<image>-dev`; the dev Kargo Warehouse auto-promotes it to the dev
-Stage. `pnpm build` and `pnpm dev` are local-only and never deploy.
+Stage. `bun run build` and `bun run dev` are local-only and never deploy.
 
 ```bash
 deploy            # build + sign + push the dev image

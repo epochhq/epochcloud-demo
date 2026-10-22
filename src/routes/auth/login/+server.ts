@@ -5,10 +5,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const timestamp = new Date().toISOString();
 
 	if (!config.betterauth.enabled) {
-		return Response.json(
-			{ success: false, action: 'login', message: 'BetterAuth not configured', timestamp },
-			{ status: 503 }
-		);
+		return Response.json({ success: false, action: 'login', message: 'BetterAuth not configured', timestamp }, { status: 503 });
 	}
 
 	try {

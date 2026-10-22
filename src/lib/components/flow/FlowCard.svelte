@@ -22,7 +22,10 @@
 		<span class="count-badge">{badge}</span>
 	</div>
 
-	<div class="flow-card" style:gap>
+	<div
+		class="flow-card"
+		style:gap
+	>
 		{@render children()}
 		{#if note}
 			<p class="flow-note">{@render note()}</p>

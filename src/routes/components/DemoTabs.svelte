@@ -28,9 +28,16 @@
 
 <div class="demo-tabs">
 	{#each tabs as tab (tab.id)}
-		<button class="demo-tab" class:active={activeDemo === tab.id} onclick={() => onSelect(tab.id)}>
+		<button
+			class="demo-tab"
+			class:active={activeDemo === tab.id}
+			onclick={() => onSelect(tab.id)}
+		>
 			{#if tab.statusKey && statuses[tab.statusKey]?.checked}
-				<span class="tab-dot" class:ok={statuses[tab.statusKey]?.ok}></span>
+				<span
+					class="tab-dot"
+					class:ok={statuses[tab.statusKey]?.ok}
+				></span>
 			{/if}
 			{tab.label}
 		</button>

@@ -33,7 +33,12 @@
 	</div>
 	<div class="dash-grid">
 		{#each dashboards as db (db.sub)}
-			<a href="https://{db.sub}.{domain}" target="_blank" rel="noopener" class="dash-card">
+			<a
+				href="https://{db.sub}.{domain}"
+				target="_blank"
+				rel="noopener"
+				class="dash-card"
+			>
 				<span class="dash-name">{db.name}</span>
 				<span class="dash-desc">{db.desc}</span>
 			</a>

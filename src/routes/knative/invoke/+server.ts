@@ -36,9 +36,7 @@ async function invokeFibonacci(n: number): Promise<FibPayload> {
 			if (resp.ok && body) {
 				return JSON.parse(body) as FibPayload;
 			}
-			lastErr = new Error(
-				`cold-start response (status ${resp.status}, ${body ? 'non-JSON body' : 'empty body'})`
-			);
+			lastErr = new Error(`cold-start response (status ${resp.status}, ${body ? 'non-JSON body' : 'empty body'})`);
 		} catch (err) {
 			lastErr = err;
 		} finally {
@@ -55,53 +53,44 @@ async function invokeFibonacci(n: number): Promise<FibPayload> {
 
 export const GET: RequestHandler = async ({ url }) => {
 	if (!config.knative.enabled) {
-		return new Response(
-			JSON.stringify({
+		return Response.json(
+			{
 				success: false,
 				error: 'Knative not configured (KNATIVE_FIBONACCI_URL not set)'
-			}),
-			{ status: 503, headers: { 'Content-Type': 'application/json' } }
+			},
+			{ status: 503 }
 		);
 	}
 
 	const n = parseInt(url.searchParams.get('n') || '10');
 	if (isNaN(n) || n < 0 || n > 50) {
-		return new Response(JSON.stringify({ success: false, error: 'n must be between 0 and 50' }), {
-			status: 400,
-			headers: { 'Content-Type': 'application/json' }
-		});
+		return Response.json({ success: false, error: 'n must be between 0 and 50' }, { status: 400 });
 	}
 
 	const startTime = performance.now();
-
 	try {
 		const data = await invokeFibonacci(n);
 		const elapsed = performance.now() - startTime;
-
 		log('info', 'Knative fibonacci invoked', { n, elapsed_ms: elapsed.toFixed(0) });
-
-		return new Response(
-			JSON.stringify({
-				success: true,
-				n,
-				result: data.result ?? data.error ?? String(data),
-				duration: data.duration ?? null,
-				latency_ms: Math.round(elapsed),
-				cold_start: elapsed > 2000,
-				timestamp: new Date().toISOString()
-			}),
-			{ headers: { 'Content-Type': 'application/json' } }
-		);
+		return Response.json({
+			success: true,
+			n,
+			result: data.result ?? data.error ?? JSON.stringify(data),
+			duration: data.duration ?? null,
+			latency_ms: Math.round(elapsed),
+			cold_start: elapsed > 2000,
+			timestamp: new Date().toISOString()
+		});
 	} catch (err) {
 		const elapsed = performance.now() - startTime;
-		return new Response(
-			JSON.stringify({
+		return Response.json(
+			{
 				success: false,
 				error: `Knative invoke failed after ${MAX_ATTEMPTS} attempts: ${String(err)}`,
 				latency_ms: Math.round(elapsed),
 				timestamp: new Date().toISOString()
-			}),
-			{ status: 502, headers: { 'Content-Type': 'application/json' } }
+			},
+			{ status: 502 }
 		);
 	}
 };
