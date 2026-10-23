@@ -74,7 +74,7 @@
 		'LitmusChaos',
 		'fail2ban (brute-force)',
 		'Kanister (data-recovery drills)',
-		'Skaffold Inner Loop',
+		'Tilt Inner Loop',
 		'Fastlane (iOS + Android)'
 	];
 

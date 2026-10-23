@@ -38,7 +38,10 @@
 	<p class="card-desc">Invoke Fibonacci and measure cold start</p>
 	{#if enabled}
 		<div class="form-row">
-			<span class="form-label" style="white-space:nowrap">n =</span>
+			<span
+				class="form-label"
+				style="white-space:nowrap">n =</span
+			>
 			<input
 				type="number"
 				bind:value={knativeN}
@@ -47,7 +50,11 @@
 				class="input input-sm"
 				style="max-width:80px"
 			/>
-			<button onclick={knativeInvoke} class="btn btn-primary btn-sm" disabled={knativeLoading}>
+			<button
+				onclick={knativeInvoke}
+				class="btn btn-primary btn-sm"
+				disabled={knativeLoading}
+			>
 				{knativeLoading ? 'Invoking...' : 'Invoke'}
 			</button>
 		</div>

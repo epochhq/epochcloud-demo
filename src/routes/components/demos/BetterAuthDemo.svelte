@@ -20,9 +20,7 @@
 			const resp = await fetch('/auth/status');
 			const d = await resp.json();
 			statusOk = d.connected;
-			statusText = d.connected
-				? `Connected - ${d.health}`
-				: `Disconnected${d.error ? ' - ' + d.error : ''}`;
+			statusText = d.connected ? `Connected - ${d.health}` : `Disconnected${d.error ? ' - ' + d.error : ''}`;
 		} catch (err) {
 			statusText = `Error: ${err}`;
 			statusOk = false;
@@ -84,29 +82,75 @@
 		<span class="card-tag">App Auth</span>
 	</div>
 	<div class="status-row">
-		<button onclick={checkStatus} class="btn btn-outline btn-sm">Check Status</button>
-		<StatusIcon ok={statusOk} checked={statusText !== 'Not checked'} />
+		<button
+			onclick={checkStatus}
+			class="btn btn-outline btn-sm">Check Status</button
+		>
+		<StatusIcon
+			ok={statusOk}
+			checked={statusText !== 'Not checked'}
+		/>
 		<span class="status-text">{statusText}</span>
 	</div>
 	{#if enabled}
 		<div class="form-cols">
 			<div class="form-col">
 				<span class="form-label">Register</span>
-				<input type="text" bind:value={regName} placeholder="Name" class="input" />
-				<input type="email" bind:value={regEmail} placeholder="Email" class="input" />
-				<input type="password" bind:value={regPass} placeholder="Password" class="input" />
-				<button onclick={register} class="btn btn-primary btn-sm w-full">Register</button>
+				<input
+					type="text"
+					bind:value={regName}
+					placeholder="Name"
+					class="input"
+				/>
+				<input
+					type="email"
+					bind:value={regEmail}
+					placeholder="Email"
+					class="input"
+				/>
+				<input
+					type="password"
+					bind:value={regPass}
+					placeholder="Password"
+					class="input"
+				/>
+				<button
+					onclick={register}
+					class="btn btn-primary btn-sm w-full">Register</button
+				>
 			</div>
 			<div class="form-col">
 				<span class="form-label">Login</span>
-				<input type="email" bind:value={loginEmail} placeholder="Email" class="input" />
-				<input type="password" bind:value={loginPass} placeholder="Password" class="input" />
-				<button onclick={login} class="btn btn-secondary btn-sm w-full">Login</button>
+				<input
+					type="email"
+					bind:value={loginEmail}
+					placeholder="Email"
+					class="input"
+				/>
+				<input
+					type="password"
+					bind:value={loginPass}
+					placeholder="Password"
+					class="input"
+				/>
+				<button
+					onclick={login}
+					class="btn btn-secondary btn-sm w-full">Login</button
+				>
 			</div>
 		</div>
-		<button onclick={session} class="btn btn-ghost w-full">Validate Session</button>
+		<button
+			onclick={session}
+			class="btn btn-ghost w-full">Validate Session</button
+		>
 		{#if resultVisible}
-			<p class="result" class:ok={resultOk} class:err={!resultOk}>{result}</p>
+			<p
+				class="result"
+				class:ok={resultOk}
+				class:err={!resultOk}
+			>
+				{result}
+			</p>
 		{/if}
 	{:else}
 		<p class="disabled-msg">Not configured - BETTERAUTH_URL not set</p>

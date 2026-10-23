@@ -4,7 +4,11 @@
 	let { size = '1rem' }: { size?: string } = $props();
 </script>
 
-<span class="flow-arrow" style:font-size={size} aria-hidden="true">&rarr;</span>
+<span
+	class="flow-arrow"
+	style:font-size={size}
+	aria-hidden="true">&rarr;</span
+>
 
 <style>
 	.flow-arrow {

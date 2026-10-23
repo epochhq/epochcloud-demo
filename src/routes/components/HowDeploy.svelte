@@ -58,13 +58,20 @@
 	];
 </script>
 
-<FlowCard title="How a Deploy Flows" badge="CI/CD">
+<FlowCard
+	title="How a Deploy Flows"
+	badge="CI/CD"
+>
 	{#each lanes as lane (lane.tag)}
 		<div class="flow-lane">
 			<span class="lane-tag lane-{lane.tone}">{lane.tag}</span>
 			<div class="flow-track">
 				{#each lane.steps as step, i (step.label)}
-					<FlowNode label={step.label} sub={step.sub} accent={step.accent ?? lane.accent} />
+					<FlowNode
+						label={step.label}
+						sub={step.sub}
+						accent={step.accent ?? lane.accent}
+					/>
 					{#if i < lane.steps.length - 1}
 						<FlowArrow size="0.85rem" />
 					{/if}
@@ -79,7 +86,11 @@
 			<span class="sub-tag">PR validation (no apply)</span>
 			<div class="flow-track">
 				{#each infraValidate as step, i (step.label)}
-					<FlowNode label={step.label} sub={step.sub} accent={step.accent ?? 'purple'} />
+					<FlowNode
+						label={step.label}
+						sub={step.sub}
+						accent={step.accent ?? 'purple'}
+					/>
 					{#if i < infraValidate.length - 1}
 						<FlowArrow size="0.85rem" />
 					{/if}
@@ -90,7 +101,11 @@
 			<span class="sub-tag">Operator apply</span>
 			<div class="flow-track">
 				{#each infraApply as step, i (step.label)}
-					<FlowNode label={step.label} sub={step.sub} accent={step.accent ?? 'purple'} />
+					<FlowNode
+						label={step.label}
+						sub={step.sub}
+						accent={step.accent ?? 'purple'}
+					/>
 					{#if i < infraApply.length - 1}
 						<FlowArrow size="0.85rem" />
 					{/if}
@@ -101,7 +116,11 @@
 			<span class="sub-tag">GitOps sync (manifests)</span>
 			<div class="flow-track">
 				{#each infraSync as step, i (step.label)}
-					<FlowNode label={step.label} sub={step.sub} accent={step.accent ?? 'purple'} />
+					<FlowNode
+						label={step.label}
+						sub={step.sub}
+						accent={step.accent ?? 'purple'}
+					/>
 					{#if i < infraSync.length - 1}
 						<FlowArrow size="0.85rem" />
 					{/if}
@@ -111,10 +130,9 @@
 	</div>
 
 	{#snippet note()}
-		Nothing reaches a cluster by hand. Application images are signed and provenance-attested before a
-		deployable tag exists, and Kargo gates prod on manual approval. Argo Workflows only validates
-		infrastructure on PRs; the actual tofu apply runs from the deploy script, and ArgoCD reconciles
-		the rendered manifests separately.
+		Nothing reaches a cluster by hand. Application images are signed and provenance-attested before a deployable tag exists, and Kargo gates prod on manual
+		approval. Argo Workflows only validates infrastructure on PRs; the actual tofu apply runs from the deploy script, and ArgoCD reconciles the rendered
+		manifests separately.
 	{/snippet}
 </FlowCard>
 
