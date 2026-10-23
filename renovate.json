@@ -5,6 +5,12 @@
 	},
 	"minimumReleaseAge": "14 days",
 	"minimumReleaseAgeBehaviour": "timestamp-required",
+	"internalChecksFilter": "strict",
+	"vulnerabilityAlerts": {
+		"minimumReleaseAge": "14 days",
+		"minimumReleaseAgeBehaviour": "timestamp-required",
+		"internalChecksFilter": "strict"
+	},
 	"packageRules": [
 		{
 			"description": "Update runtime archive URLs with native Nix hash regeneration.",
@@ -29,7 +35,7 @@
 			"description": "Keep tooling on the supported Node LTS line.",
 			"matchPackageNames": ["node"],
 			"matchFileNames": ["package.json", "flake.nix", "Dockerfile"],
-			"allowedVersions": "/^24\\./"
+			"allowedVersions": "/^v?24\\./"
 		},
 		{
 			"description": "Keep canonical versions, runtime archives and the application image in one update.",
