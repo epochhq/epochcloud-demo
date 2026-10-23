@@ -1,5 +1,5 @@
 # Build stage
-FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea AS builder
+FROM docker.io/library/node:26.12.1-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS builder
 
 # git is needed by `vite build`: vite.config.ts stamps the build commit from the
 # checked-out .git via `git rev-parse`. Stamping the commit through git (not a
@@ -45,7 +45,7 @@ RUN pnpm build
 RUN pnpm prune --prod
 
 # Runtime stage
-FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea
+FROM docker.io/library/node:26.12.1-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
 
 # Install ca-certificates for HTTPS
 RUN apk --no-cache add ca-certificates
