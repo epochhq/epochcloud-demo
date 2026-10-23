@@ -1,3 +1,19 @@
 {
-  "lockFileMaintenance": { "enabled": true }
+  "lockFileMaintenance": { "enabled": true },
+  "packageRules": [
+    {
+      "description": "Keep the application image on supported Node 26 patches with the release waiting period.",
+      "matchManagers": ["dockerfile"],
+      "matchPackageNames": ["docker.io/library/node"],
+      "allowedVersions": "/^26\\./",
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "description": "Permit the exact Brotli and certificate-validation security release without delaying the fix.",
+      "matchManagers": ["dockerfile"],
+      "matchPackageNames": ["docker.io/library/node"],
+      "matchNewValue": "/^26\\.12\\.1-alpine$/",
+      "minimumReleaseAge": "0 days"
+    }
+  ]
 }
