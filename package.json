@@ -8,9 +8,9 @@
 		"dev": "vp dev",
 		"build": "vp build",
 		"preview": "vp preview",
-		"check": "nix --extra-experimental-features \"nix-command flakes\" eval --offline --no-update-lock-file --raw .#runtimeConsistency && vp check && bun run lint:svelte && bun run typecheck && bun run check:svelte",
+		"check": "nix --extra-experimental-features \"nix-command flakes\" eval --offline --no-update-lock-file --raw .#runtimeConsistency && svelte-kit sync && vp check && bun run lint:svelte && bun run typecheck && bun run check:svelte",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"lint": "vp lint . && bun run lint:svelte",
+		"lint": "svelte-kit sync && vp lint . && bun run lint:svelte",
 		"format": "vp fmt .",
 		"start": "bun --preload ./runtime-check.js ./build/index.js",
 		"typecheck": "svelte-kit sync && tsc --noEmit",
@@ -59,8 +59,8 @@
 	},
 	"trustedDependencies": [],
 	"catalog": {
-		"vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",
-		"vite-plus": "1.1.0"
+		"vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
+		"vite-plus": "1.4.0"
 	},
 	"overrides": {
 		"vite": "catalog:"
