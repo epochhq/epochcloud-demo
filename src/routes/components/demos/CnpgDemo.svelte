@@ -1,5 +1,5 @@
 <script lang="ts">
-	import StatusIcon from '$lib/components/StatusIcon.svelte';
+	import StatusIcon from '#lib/components/StatusIcon.svelte';
 
 	let { enabled, environment }: { enabled: boolean; environment: string } = $props();
 

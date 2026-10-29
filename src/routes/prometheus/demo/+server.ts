@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import client from 'prom-client';
-import { env } from '$env/dynamic/private';
-import { registry, httpRequestsTotal, activeRequests, httpRequestDuration, errorsTotal } from '$lib/server/metrics.js';
+import * as env from '$app/env/private';
+import { registry, httpRequestsTotal, activeRequests, httpRequestDuration, errorsTotal } from '#lib/server/metrics.js';
 import os from 'node:os';
 
 // Demo counter - users can increment this to see Prometheus metrics in action

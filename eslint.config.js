@@ -1,4 +1,4 @@
-// ESLint flat config for epochcloud-sveltekit (SvelteKit 5 + TS)
+// ESLint flat config for epochcloud-sveltekit (SvelteKit 3, Svelte 5 + TS)
 import js from '@eslint/js';
 import svelte from 'eslint-plugin-svelte';
 import tseslint from 'typescript-eslint';

@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
-import { config } from '$lib/server/config.js';
-import { log } from '$lib/server/logger.js';
+import { config } from '#lib/server/config.js';
+import { log } from '#lib/server/logger.js';
 
 export const POST: RequestHandler = async ({ request }) => {
 	if (!config.ntfy.enabled) {

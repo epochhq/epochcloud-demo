@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
-import { config } from '$lib/server/config.js';
-import { log } from '$lib/server/logger.js';
+import { config } from '#lib/server/config.js';
+import { log } from '#lib/server/logger.js';
 
 // Scale-from-zero window: the Kourier/activator path can return an empty or
 // non-JSON body (or a transient 503) for the first request while the pod is

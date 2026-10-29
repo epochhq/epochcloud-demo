@@ -1,4 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite';
+import adapter from '@sveltejs/adapter-bun';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig, lazyPlugins } from 'vite-plus';
@@ -180,7 +182,13 @@ export default defineConfig({
 		include: ['tests/local/**/*.test.ts'],
 		testTimeout: 1000
 	},
-	plugins: lazyPlugins(() => [sveltekit()]),
+	plugins: lazyPlugins(() => [
+		sveltekit({
+			preprocess: vitePreprocess(),
+			adapter: adapter({ out: 'build', precompress: false, envPrefix: '' }),
+			tracing: { server: true }
+		})
+	]),
 	define: {
 		__APP_VERSION__: JSON.stringify(readVersion()),
 		__APP_COMMIT__: JSON.stringify(readCommit()),

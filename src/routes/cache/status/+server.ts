@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { getValkeyStatus } from '$lib/server/valkey.js';
+import { getValkeyStatus } from '#lib/server/valkey.js';
 
 export const GET: RequestHandler = async () => {
 	const status = getValkeyStatus();

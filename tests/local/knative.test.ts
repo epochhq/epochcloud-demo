@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vite-plus/test';
 
-vi.mock('$lib/server/config.js', () => ({ config: { knative: { enabled: true, fibonacciUrl: 'http://fibonacci.test' } } }));
-vi.mock('$lib/server/logger.js', () => ({ log: vi.fn() }));
+vi.mock('#lib/server/config.js', () => ({ config: { knative: { enabled: true, fibonacciUrl: 'http://fibonacci.test' } } }));
+vi.mock('#lib/server/logger.js', () => ({ log: vi.fn() }));
 
 import { GET } from '../../src/routes/knative/invoke/+server.js';
 

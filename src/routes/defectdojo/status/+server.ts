@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { getDefectDojoStatus } from '$lib/server/defectdojo.js';
+import { getDefectDojoStatus } from '#lib/server/defectdojo.js';
 
 export const GET: RequestHandler = async () => {
 	const status = await getDefectDojoStatus();

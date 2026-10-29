@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { config } from '$lib/server/config.js';
+import { config } from '#lib/server/config.js';
 
 export const GET: RequestHandler = async () => {
 	if (!config.crowdsec.enabled) {

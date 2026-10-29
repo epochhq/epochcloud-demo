@@ -1,7 +1,7 @@
 <script lang="ts">
-	import FlowCard from '$lib/components/flow/FlowCard.svelte';
-	import FlowNode from '$lib/components/flow/FlowNode.svelte';
-	import FlowArrow from '$lib/components/flow/FlowArrow.svelte';
+	import FlowCard from '#lib/components/flow/FlowCard.svelte';
+	import FlowNode from '#lib/components/flow/FlowNode.svelte';
+	import FlowArrow from '#lib/components/flow/FlowArrow.svelte';
 
 	// Backup + data-retention flow. Four sources converge on SeaweedFS S3, with
 	// retention tiers and verified restore. An independent monitor layer watches

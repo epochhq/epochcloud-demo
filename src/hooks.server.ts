@@ -1,12 +1,12 @@
-import type { Handle } from '@sveltejs/kit';
-import { config } from '$lib/server/config.js';
-import { log } from '$lib/server/logger.js';
-import { appInfo, httpRequestsTotal, httpRequestDuration, activeRequests } from '$lib/server/metrics.js';
-import { initRabbitMQ, startConsumer } from '$lib/server/rabbitmq.js';
-import { initValkey } from '$lib/server/valkey.js';
-import { initCnpg } from '$lib/server/cnpg.js';
-import { initDefectDojo } from '$lib/server/defectdojo.js';
-import { initSmtp } from '$lib/server/smtp.js';
+import type { Handle } from '@sveltejs/kit/hooks';
+import { config } from '#lib/server/config.js';
+import { log } from '#lib/server/logger.js';
+import { appInfo, httpRequestsTotal, httpRequestDuration, activeRequests } from '#lib/server/metrics.js';
+import { initRabbitMQ, startConsumer } from '#lib/server/rabbitmq.js';
+import { initValkey } from '#lib/server/valkey.js';
+import { initCnpg } from '#lib/server/cnpg.js';
+import { initDefectDojo } from '#lib/server/defectdojo.js';
+import { initSmtp } from '#lib/server/smtp.js';
 
 // --- Initialization (runs once on server start) ---
 

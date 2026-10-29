@@ -1,6 +1,6 @@
 <script lang="ts">
-	import FlowCard from '$lib/components/flow/FlowCard.svelte';
-	import type { FlowAccent } from '$lib/components/flow/FlowNode.svelte';
+	import FlowCard from '#lib/components/flow/FlowCard.svelte';
+	import type { FlowAccent } from '#lib/components/flow/FlowNode.svelte';
 
 	// Security model as a full defense-in-depth view. Five layers, each verified
 	// against platform-identity, platform-network, platform-security,

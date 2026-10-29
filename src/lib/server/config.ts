@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { otelEndpoint } from './otel.js';
 import { readSecret } from './secrets.js';
 

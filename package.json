@@ -6,7 +6,7 @@
 	"packageManager": "bun@1.4.4",
 	"scripts": {
 		"dev": "vp dev",
-		"build": "vp build",
+		"build": "bun --bun vp build",
 		"preview": "vp preview",
 		"check": "nix --extra-experimental-features \"nix-command flakes\" eval --offline --no-update-lock-file --raw .#runtimeConsistency && svelte-kit sync && vp check && bun run lint:svelte && bun run typecheck && bun run check:svelte",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -20,8 +20,8 @@
 		"lint:svelte": "eslint \"src/**/*.svelte\""
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-node": "5.5.7",
-		"@sveltejs/kit": "2.70.3",
+		"@sveltejs/adapter-bun": "1.0.0",
+		"@sveltejs/kit": "3.1.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@types/amqplib": "^0.10.7",
 		"@types/nodemailer": "^8.0.0",
@@ -64,5 +64,8 @@
 	"overrides": {
 		"vite": "catalog:"
 	},
-	"workspaces": []
+	"workspaces": [],
+	"imports": {
+		"#lib/*": "./src/lib/*"
+	}
 }

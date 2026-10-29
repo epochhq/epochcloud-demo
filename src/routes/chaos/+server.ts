@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { errorsTotal } from '$lib/server/metrics.js';
+import { errorsTotal } from '#lib/server/metrics.js';
 
 // In-memory degradation counter (per process)
 let degradeCounter = 0;

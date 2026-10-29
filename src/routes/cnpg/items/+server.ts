@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { listItems, createItem, deleteItem } from '$lib/server/cnpg.js';
+import { listItems, createItem, deleteItem } from '#lib/server/cnpg.js';
 
 export const GET: RequestHandler = async () => {
 	try {

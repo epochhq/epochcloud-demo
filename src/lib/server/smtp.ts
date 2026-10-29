@@ -32,7 +32,7 @@ This email was sent by the SvelteKit demo app running on the EpochCloud platform
 Server: ${config.hostname}
 Version: ${config.version}
 Environment: ${config.environment}
-Framework: SvelteKit 5
+Framework: SvelteKit 3
 Timestamp: ${new Date().toISOString()}
 
 Pipeline: SvelteKit App → Maddy (SMTP relay) → Resend API → DKIM-signed delivery

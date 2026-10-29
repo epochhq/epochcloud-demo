@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vite-plus/test';
 
 const { sendEmail, config } = vi.hoisted(() => ({ sendEmail: vi.fn(), config: { smtp: { enabled: true } } }));
-vi.mock('$lib/server/smtp.js', () => ({ sendEmail }));
-vi.mock('$lib/server/config.js', () => ({ config }));
+vi.mock('#lib/server/smtp.js', () => ({ sendEmail }));
+vi.mock('#lib/server/config.js', () => ({ config }));
 
 import { GET, POST } from '../../src/routes/email/send/+server.js';
 

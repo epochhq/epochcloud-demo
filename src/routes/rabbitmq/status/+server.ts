@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { getRabbitStatus } from '$lib/server/rabbitmq.js';
+import { getRabbitStatus } from '#lib/server/rabbitmq.js';
 
 export const GET: RequestHandler = async () => {
 	const status = await getRabbitStatus();

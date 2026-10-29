@@ -1,11 +1,10 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 
-// Read straight from process.env rather than $env/dynamic/private. SvelteKit
-// runs instrumentation.server.ts before the server populates the dynamic env,
-// so a $env read here resolves against an empty object - and since config.ts
-// evaluates its fields eagerly, importing it from that entrypoint would freeze
-// every other integration at its default for the life of the process.
+// SvelteKit 3 initializes runtime environment variables before loading
+// instrumentation.server.ts. Read the exporter endpoint directly here so
+// tracing starts before application imports, without initializing unrelated
+// service configuration or resolving mounted secret files in this entrypoint.
 //
 // This is the only place the endpoint is parsed; config.otelEndpoint re-exports
 // it so the value an operator sees is the value the exporter is wired to.

@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { valkeySet } from '$lib/server/valkey.js';
+import { valkeySet } from '#lib/server/valkey.js';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const key = url.searchParams.get('key') || 'demo-key';

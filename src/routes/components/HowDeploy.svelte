@@ -1,8 +1,8 @@
 <script lang="ts">
-	import FlowCard from '$lib/components/flow/FlowCard.svelte';
-	import FlowNode from '$lib/components/flow/FlowNode.svelte';
-	import FlowArrow from '$lib/components/flow/FlowArrow.svelte';
-	import type { FlowAccent } from '$lib/components/flow/FlowNode.svelte';
+	import FlowCard from '#lib/components/flow/FlowCard.svelte';
+	import FlowNode from '#lib/components/flow/FlowNode.svelte';
+	import FlowArrow from '#lib/components/flow/FlowArrow.svelte';
+	import type { FlowAccent } from '#lib/components/flow/FlowNode.svelte';
 
 	// CI/CD flow. Two distinct pipelines. The application path is the Argo
 	// Workflows build DAG (workflow-templates/app/main.yaml) feeding Kargo and

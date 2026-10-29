@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
-import { publishMessage } from '$lib/server/rabbitmq.js';
-import { config } from '$lib/server/config.js';
+import { publishMessage } from '#lib/server/rabbitmq.js';
+import { config } from '#lib/server/config.js';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const message = url.searchParams.get('message') || `Hello from SvelteKit (${config.hostname}) at ${new Date().toISOString()}`;

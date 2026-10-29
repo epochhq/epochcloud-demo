@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
-import { sendEmail } from '$lib/server/smtp.js';
-import { config } from '$lib/server/config.js';
+import { sendEmail } from '#lib/server/smtp.js';
+import { config } from '#lib/server/config.js';
 
 async function deliverEmail(email: string): Promise<Response> {
 	if (!config.smtp.enabled) {

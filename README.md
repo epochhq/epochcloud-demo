@@ -1,6 +1,6 @@
 # epochcloud-demo
 
-SvelteKit 5 demo app for the EpochCloud Kubernetes platform.
+SvelteKit 3 and Svelte 5 demo app for the EpochCloud Kubernetes platform.
 
 ## Quick Links
 
@@ -12,7 +12,7 @@ SvelteKit 5 demo app for the EpochCloud Kubernetes platform.
 
 ## Purpose
 
-**Proof-of-concept app** demonstrating the complete EpochCloud deployment flow using **SvelteKit 5** (the production framework). Shows the same platform integrations as the Go test app:
+**Proof-of-concept app** demonstrating the complete EpochCloud deployment flow using **SvelteKit 3 and Svelte 5** (the production framework). Shows the same platform integrations as the Go test app:
 
 - **Prometheus metrics** via `prom-client` (`/metrics`)
 - **Health probe** (`/health`)
@@ -34,8 +34,7 @@ SvelteKit 5 demo app for the EpochCloud Kubernetes platform.
 epochcloud-demo/
 ├── Dockerfile                    # Multi-stage frozen Bun build
 ├── package.json                  # Dependencies
-├── svelte.config.js              # SvelteKit + adapter-node
-├── vite.config.ts                # Vite config
+├── vite.config.ts                # SvelteKit + official Bun adapter
 ├── VERSION                       # App version
 ├── src/
 │   ├── app.html                  # HTML shell
@@ -178,10 +177,16 @@ the permission. `bun run check` verifies the canonical runtime versions against 
 locked archives offline and refuses stale locks. Updates wait fourteen days, with
 exceptions only for the explicitly pinned Bun 1.4.4 and Node 24.22.1 security fixes.
 
-The production runtime is Bun using SvelteKit's existing adapter-node output.
+The production runtime is Bun using SvelteKit's first-party `@sveltejs/adapter-bun`.
+The same emitted image serves multiple hosts; no origin is baked into the build.
+The adapter uses Host and defaults to HTTPS for the public origin. Behind the
+existing trusted proxy, `PROTOCOL_HEADER=X-Forwarded-Proto` preserves its scheme;
+only set header overrides when the proxy overwrites them. Cross-origin form
+requests remain subject to SvelteKit's default CSRF checks.
 Its preload verifies the actual Bun version against `package.json` before loading
 the generated server, so changing only the container's runtime pin fails startup.
-Node 24 runs Vite+ development, builds, TypeScript/JavaScript lint and Svelte formatting.
+Node 24 runs supported development, TypeScript/JavaScript lint and Svelte formatting tools.
+Production builds run Vite+ under Bun as required by the adapter.
 Server regression tests run Vite+ under Bun. Svelte component lint retains the existing ESLint rules because the
 target Vite+ linter does not enforce them; `bun run check` runs both scopes.
 TypeScript 7
