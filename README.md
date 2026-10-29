@@ -21,7 +21,7 @@ SvelteKit 5 demo app for the EpochCloud Kubernetes platform.
 - **DefectDojo** security status API client
 - **Email** via Maddy SMTP relay (nodemailer)
 - **Chaos testing** (error injection, slow responses, load simulation)
-- **BetterAuth** client SDK (connects to standalone auth server)
+- **BetterAuth** HTTP status and session forwarding to the standalone auth server
 - **Structured logging** (JSON via custom logger)
 - **Consumer mode** (KEDA-scaled queue consumer)
 - **Rybbit** web analytics (siteId synced from infrastructure)
@@ -42,7 +42,6 @@ epochcloud-demo/
 │   ├── hooks.server.ts           # Metrics middleware, service init
 │   ├── instrumentation.server.ts # Tracing bootstrap, loaded before app code
 │   ├── lib/
-│   │   ├── auth-client.ts        # BetterAuth client SDK
 │   │   └── server/
 │   │       ├── config.ts         # Env var config
 │   │       ├── otel.ts           # OTLP span exporter setup
@@ -62,6 +61,7 @@ epochcloud-demo/
 │       ├── rabbitmq/             # /rabbitmq/status, /rabbitmq/publish
 │       ├── cache/                # /cache/status, /cache/set, /cache/get
 │       ├── defectdojo/           # /defectdojo/status
+│       ├── auth/                 # /auth/status, /auth/session
 │       └── email/                # /email/send
 └── renovate.json
 ```

@@ -51,13 +51,19 @@
 		{
 			"description": "Exact Bun compromised-key security release; future versions retain the fourteen-day wait.",
 			"matchPackageNames": ["bun", "oven/bun", "oven-sh/bun"],
-			"matchNewValue": "/^1\\.4\\.4(?:-slim)?$/",
+			"matchNewValue": "/^1\\.4\\.4(?:-slim|-alpine)?$/",
 			"minimumReleaseAge": "0 days"
 		},
 		{
 			"description": "Exact Node security release, including OpenSSL3.5.9; future versions retain the fourteen-day wait.",
 			"matchPackageNames": ["node"],
 			"matchNewValue": "/^24\\.22\\.1(?:-trixie-slim)?$/",
+			"minimumReleaseAge": "0 days"
+		},
+		{
+			"description": "Exact SMTP address-parser security release; future versions retain the fourteen-day wait.",
+			"matchPackageNames": ["nodemailer"],
+			"matchNewValue": "/^10\\.1\\.4$/",
 			"minimumReleaseAge": "0 days"
 		}
 	],
