@@ -51,19 +51,25 @@
 		{
 			"description": "Exact Bun compromised-key security release; future versions retain the fourteen-day wait.",
 			"matchPackageNames": ["bun", "oven/bun", "oven-sh/bun"],
-			"matchNewValue": "/^1\\.4\\.4(?:-slim|-alpine)?$/",
+			"matchJsonata": [
+				"($candidate := ($exists(newValue) ? newValue : version); $type($candidate) = 'string' ? $boolean($match($candidate, /^1\\.4\\.4(?:-slim|-alpine)?$/)) : false)"
+			],
 			"minimumReleaseAge": "0 days"
 		},
 		{
 			"description": "Exact Node security release, including OpenSSL3.5.9; future versions retain the fourteen-day wait.",
 			"matchPackageNames": ["node"],
-			"matchNewValue": "/^24\\.22\\.1(?:-trixie-slim)?$/",
+			"matchJsonata": [
+				"($candidate := ($exists(newValue) ? newValue : (datasource = 'node-version' and $type(version) = 'string' ? $replace(version, /^v/, '') : version)); $type($candidate) = 'string' ? $boolean($match($candidate, /^24\\.22\\.1(?:-trixie-slim)?$/)) : false)"
+			],
 			"minimumReleaseAge": "0 days"
 		},
 		{
 			"description": "Exact SMTP address-parser security release; future versions retain the fourteen-day wait.",
 			"matchPackageNames": ["nodemailer"],
-			"matchNewValue": "/^10\\.1\\.4$/",
+			"matchJsonata": [
+				"($candidate := ($exists(newValue) ? newValue : version); $type($candidate) = 'string' ? $boolean($match($candidate, /^10\\.1\\.4$/)) : false)"
+			],
 			"minimumReleaseAge": "0 days"
 		}
 	],
