@@ -3,8 +3,8 @@
 node_modules
 .svelte-kit
 build
-.env
-.env.*
+**/.env
+**/.env.*
 *.log
 STATUS.md
 tests
