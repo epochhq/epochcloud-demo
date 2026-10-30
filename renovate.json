@@ -20,7 +20,7 @@
 			"minimumReleaseAge": "14 days",
 			"autoReplaceGlobalMatch": true,
 			"constraints": {
-				"nix": "2.35.2"
+				"nix": "2.35.3"
 			},
 			"postUpgradeTasks": {
 				"commands": ["nix --extra-experimental-features 'nix-command flakes' flake lock"],
