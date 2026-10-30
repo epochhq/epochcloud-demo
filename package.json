@@ -1,51 +1,71 @@
 {
-  "name": "epochcloud-demo",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "packageManager": "pnpm@11.0.9",
-  "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
-    "preview": "vite preview",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "lint": "eslint .",
-    "format": "prettier -w ."
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@sveltejs/adapter-node": "^5.2.12",
-    "@sveltejs/kit": "^2.21.1",
-    "@sveltejs/vite-plugin-svelte": "^7.0.0",
-    "@types/amqplib": "^0.10.7",
-    "@types/nodemailer": "^8.0.0",
-    "@types/pg": "^8.20.0",
-    "eslint": "latest",
-    "eslint-config-prettier": "latest",
-    "eslint-plugin-svelte": "latest",
-    "prettier": "latest",
-    "prettier-plugin-svelte": "latest",
-    "svelte": "^5.34.6",
-    "svelte-check": "^4.2.1",
-    "typescript": "^6.0.0",
-    "typescript-eslint": "latest",
-    "vite": "^8.0.0"
-  },
-  "dependencies": {
-    "@grafana/faro-web-sdk": "^2.3.0",
-    "@grafana/faro-web-tracing": "^2.3.0",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/exporter-trace-otlp-grpc": "^0.217.0",
-    "@opentelemetry/resources": "^2.0.0",
-    "@opentelemetry/sdk-node": "^0.217.0",
-    "@opentelemetry/sdk-trace-node": "^2.0.0",
-    "@opentelemetry/semantic-conventions": "^1.34.0",
-    "amqplib": "^1.0.0",
-    "better-auth": "^1.2.8",
-    "ioredis": "^5.6.1",
-    "nodemailer": "^8.0.0",
-    "pg": "^8.20.0",
-    "prom-client": "^15.1.3"
-  }
+	"name": "epochcloud-demo",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"packageManager": "bun@1.4.4",
+	"scripts": {
+		"dev": "vp dev",
+		"build": "bun --bun vp build",
+		"preview": "vp preview",
+		"check": "nix --extra-experimental-features \"nix-command flakes\" eval --offline --no-update-lock-file --raw .#runtimeConsistency && svelte-kit sync && vp check && bun run lint:svelte && bun run typecheck && bun run check:svelte",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"lint": "svelte-kit sync && vp lint . && bun run lint:svelte",
+		"format": "vp fmt .",
+		"start": "bun --preload ./runtime-check.js ./build/index.js",
+		"typecheck": "svelte-kit sync && tsc --noEmit",
+		"check:svelte": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"test": "bun --bun vp test",
+		"fmt:check": "vp fmt --check",
+		"lint:svelte": "eslint \"src/**/*.svelte\""
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-bun": "1.0.0",
+		"@sveltejs/kit": "3.1.0",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@types/amqplib": "^0.10.7",
+		"@types/nodemailer": "^8.0.0",
+		"@types/pg": "^8.20.0",
+		"eslint-plugin-svelte": "latest",
+		"svelte": "5.57.2",
+		"svelte-check": "^4.2.1",
+		"typescript": "npm:@typescript/typescript6@6.0.2",
+		"vite": "catalog:",
+		"vite-plus": "catalog:",
+		"@typescript/native": "npm:typescript@7.0.2",
+		"eslint": "10.4.0",
+		"@eslint/js": "10.0.1",
+		"typescript-eslint": "8.59.4"
+	},
+	"dependencies": {
+		"@grafana/faro-web-sdk": "2.12.1",
+		"@grafana/faro-web-tracing": "2.12.1",
+		"@opentelemetry/api": "^1.9.0",
+		"@opentelemetry/exporter-trace-otlp-grpc": "0.223.0",
+		"@opentelemetry/resources": "2.12.0",
+		"@opentelemetry/sdk-node": "0.223.0",
+		"@opentelemetry/sdk-trace-node": "2.12.0",
+		"@opentelemetry/semantic-conventions": "^1.34.0",
+		"amqplib": "^1.0.0",
+		"ioredis": "^5.6.1",
+		"nodemailer": "10.1.4",
+		"pg": "^8.20.0",
+		"prom-client": "^15.1.3"
+	},
+	"engines": {
+		"bun": "1.4.4",
+		"node": "24.22.1"
+	},
+	"trustedDependencies": [],
+	"catalog": {
+		"vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
+		"vite-plus": "1.4.0"
+	},
+	"overrides": {
+		"vite": "catalog:"
+	},
+	"workspaces": [],
+	"imports": {
+		"#lib/*": "./src/lib/*"
+	}
 }

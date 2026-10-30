@@ -1,5 +1,53 @@
 {
   "nodes": {
+    "bun-aarch64-darwin": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-zaqy/Ke/tSA0iVUm//hxRT9A/g1xdsZPSM08NoBc8sw=",
+        "type": "file",
+        "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-aarch64.zip"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-aarch64.zip"
+      }
+    },
+    "bun-aarch64-linux": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-dGlb+IkaurfBKyitp8ZFRFZY3pk+PGVeNNl4HHdIn5Q=",
+        "type": "file",
+        "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip"
+      }
+    },
+    "bun-x86_64-darwin": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-C/1CQ+utMDqkUNuajZKiIKalqhm3dy2l+PRdj6+ElSM=",
+        "type": "file",
+        "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-x64-baseline.zip"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-x64-baseline.zip"
+      }
+    },
+    "bun-x86_64-linux": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-y6I7lmoEz7UEnzxZdsnqU8oSrYEcnbXuvEZR5njPSPw=",
+        "type": "file",
+        "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -34,10 +82,66 @@
         "type": "github"
       }
     },
+    "node-aarch64-darwin": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-JTZBd3E8n8w2H/h0zzpfxO/OpHWaP7pF4pBA7h4CVa0=",
+        "type": "file",
+        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-arm64.tar.xz"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-arm64.tar.xz"
+      }
+    },
+    "node-aarch64-linux": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-UUJeC1cTFu4qEX3/JuXpaHncJLV6LyL9d/OFLfEbCsk=",
+        "type": "file",
+        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-arm64.tar.xz"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-arm64.tar.xz"
+      }
+    },
+    "node-x86_64-darwin": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-fvyUs1+RNNRze03Q07zAVQU5N32x8D+irGoUFv3fhu8=",
+        "type": "file",
+        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-x64.tar.xz"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-x64.tar.xz"
+      }
+    },
+    "node-x86_64-linux": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-alfyYrFRUFJtUgQhvBnyss3szzFEMAyvhQNv2CqwlCQ=",
+        "type": "file",
+        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-x64.tar.xz"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-x64.tar.xz"
+      }
+    },
     "root": {
       "inputs": {
+        "bun-aarch64-darwin": "bun-aarch64-darwin",
+        "bun-aarch64-linux": "bun-aarch64-linux",
+        "bun-x86_64-darwin": "bun-x86_64-darwin",
+        "bun-x86_64-linux": "bun-x86_64-linux",
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "node-aarch64-darwin": "node-aarch64-darwin",
+        "node-aarch64-linux": "node-aarch64-linux",
+        "node-x86_64-darwin": "node-x86_64-darwin",
+        "node-x86_64-linux": "node-x86_64-linux"
       }
     },
     "systems": {

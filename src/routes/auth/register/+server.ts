@@ -1,14 +1,11 @@
 import type { RequestHandler } from './$types';
-import { config } from '$lib/server/config.js';
+import { config } from '#lib/server/config.js';
 
 export const POST: RequestHandler = async ({ request }) => {
 	const timestamp = new Date().toISOString();
 
 	if (!config.betterauth.enabled) {
-		return Response.json(
-			{ success: false, action: 'register', message: 'BetterAuth not configured', timestamp },
-			{ status: 503 }
-		);
+		return Response.json({ success: false, action: 'register', message: 'BetterAuth not configured', timestamp }, { status: 503 });
 	}
 
 	try {

@@ -67,8 +67,7 @@
 				d = JSON.parse(body);
 			} catch {
 				const looksLikeHtml = body.trimStart().startsWith('<');
-				const intercepted =
-					looksLikeHtml && (resp.status === 502 || resp.status === 504);
+				const intercepted = looksLikeHtml && (resp.status === 502 || resp.status === 504);
 				chaosHistory = [
 					{
 						action,
@@ -132,9 +131,7 @@
 	<div class="chaos-header">
 		<div>
 			<h3>Chaos Testing</h3>
-			<p class="card-desc">
-				Inject failures, latency, and resource pressure to test observability and resilience
-			</p>
+			<p class="card-desc">Inject failures, latency, and resource pressure to test observability and resilience</p>
 		</div>
 		{#if chaosLoading}<span class="chaos-loading">Running...</span>{/if}
 	</div>
@@ -166,9 +163,7 @@
 		<!-- Latency Injection -->
 		<div class="chaos-section chaos-warning">
 			<h4 class="chaos-section-title">Latency Injection</h4>
-			<p class="chaos-section-desc">
-				Inject delays to observe p99 latency in Linkerd and Prometheus
-			</p>
+			<p class="chaos-section-desc">Inject delays to observe p99 latency in Linkerd and Prometheus</p>
 			<div class="chaos-fields">
 				<div class="chaos-field">
 					<span class="chaos-field-label">Fixed delay</span>
@@ -226,9 +221,7 @@
 		<!-- Resource Pressure -->
 		<div class="chaos-section chaos-accent">
 			<h4 class="chaos-section-title">Resource Pressure</h4>
-			<p class="chaos-section-desc">
-				Stress CPU/memory to observe metrics, OOM behavior, and scaling
-			</p>
+			<p class="chaos-section-desc">Stress CPU/memory to observe metrics, OOM behavior, and scaling</p>
 			<div class="chaos-fields">
 				<div class="chaos-field">
 					<span class="chaos-field-label">CPU burn</span>
@@ -290,9 +283,7 @@
 		<!-- Failure Patterns -->
 		<div class="chaos-section chaos-muted">
 			<h4 class="chaos-section-title">Failure Patterns</h4>
-			<p class="chaos-section-desc">
-				Intermittent errors, cascading failures, and gradual degradation
-			</p>
+			<p class="chaos-section-desc">Intermittent errors, cascading failures, and gradual degradation</p>
 			<div class="chaos-fields">
 				<div class="chaos-field">
 					<span class="chaos-field-label">Flaky endpoint</span>
@@ -338,17 +329,11 @@
 						<div class="degrade-progress">
 							<div
 								class="degrade-bar"
-								style="width: {Math.min(
-									(chaosDegradeState.current / chaosDegradeState.max) * 100,
-									100
-								)}%"
+								style="width: {Math.min((chaosDegradeState.current / chaosDegradeState.max) * 100, 100)}%"
 							></div>
 						</div>
 						<span class="chaos-unit"
-							>{chaosDegradeState.current}/{chaosDegradeState.max} requests{chaosDegradeState.current >=
-							chaosDegradeState.max
-								? ' (saturated)'
-								: ''}</span
+							>{chaosDegradeState.current}/{chaosDegradeState.max} requests{chaosDegradeState.current >= chaosDegradeState.max ? ' (saturated)' : ''}</span
 						>
 					{/if}
 				</div>
@@ -379,10 +364,16 @@
 			</div>
 			<div class="chaos-log-entries">
 				{#each chaosHistory as entry (entry.timestamp)}
-					<div class="chaos-log-entry" class:ok={entry.ok} class:err={!entry.ok}>
+					<div
+						class="chaos-log-entry"
+						class:ok={entry.ok}
+						class:err={!entry.ok}
+					>
 						<div class="chaos-log-main">
-							<span class="chaos-log-badge" class:ok={entry.ok} class:err={!entry.ok}
-								>{entry.ok ? '✓' : '✗'}</span
+							<span
+								class="chaos-log-badge"
+								class:ok={entry.ok}
+								class:err={!entry.ok}>{entry.ok ? '✓' : '✗'}</span
 							>
 							<span class="chaos-log-action">{entry.action}</span>
 							<span class="chaos-log-msg">{entry.message}</span>

@@ -1,9 +1,9 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from './config.js';
 import { log } from './logger.js';
 import { emailsSentTotal, emailErrors } from './metrics.js';
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 
 export function initSmtp(): void {
 	if (!config.smtp.enabled) {
@@ -14,10 +14,7 @@ export function initSmtp(): void {
 	transporter = nodemailer.createTransport({
 		host: config.smtp.host,
 		port: config.smtp.port,
-		secure: false, // STARTTLS
-		tls: {
-			rejectUnauthorized: false // Internal relay (Maddy in-cluster)
-		}
+		secure: false // STARTTLS
 	});
 
 	log('info', 'SMTP configured', { host: config.smtp.host, port: config.smtp.port });
@@ -35,7 +32,7 @@ This email was sent by the SvelteKit demo app running on the EpochCloud platform
 Server: ${config.hostname}
 Version: ${config.version}
 Environment: ${config.environment}
-Framework: SvelteKit 5
+Framework: SvelteKit 3
 Timestamp: ${new Date().toISOString()}
 
 Pipeline: SvelteKit App → Maddy (SMTP relay) → Resend API → DKIM-signed delivery

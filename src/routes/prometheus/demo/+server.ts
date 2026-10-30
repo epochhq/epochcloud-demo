@@ -1,13 +1,7 @@
 import type { RequestHandler } from './$types';
 import client from 'prom-client';
-import { env } from '$env/dynamic/private';
-import {
-	registry,
-	httpRequestsTotal,
-	activeRequests,
-	httpRequestDuration,
-	errorsTotal
-} from '$lib/server/metrics.js';
+import * as env from '$app/env/private';
+import { registry, httpRequestsTotal, activeRequests, httpRequestDuration, errorsTotal } from '#lib/server/metrics.js';
 import os from 'node:os';
 
 // Demo counter - users can increment this to see Prometheus metrics in action
@@ -41,9 +35,7 @@ async function queryPrometheus(promql: string): Promise<number> {
 }
 
 /** Query Prometheus for multiple results (e.g., by label) */
-async function queryPrometheusMulti(
-	promql: string
-): Promise<Array<{ labels: Record<string, string>; value: number }>> {
+async function queryPrometheusMulti(promql: string): Promise<Array<{ labels: Record<string, string>; value: number }>> {
 	if (!PROMETHEUS_URL) return [];
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), 3000);
@@ -53,12 +45,10 @@ async function queryPrometheusMulti(
 		});
 		if (!resp.ok) return [];
 		const data = await resp.json();
-		return (data?.data?.result ?? []).map(
-			(r: { metric: Record<string, string>; value: [number, string] }) => ({
-				labels: r.metric,
-				value: parseFloat(r.value[1])
-			})
-		);
+		return (data?.data?.result ?? []).map((r: { metric: Record<string, string>; value: [number, string] }) => ({
+			labels: r.metric,
+			value: parseFloat(r.value[1])
+		}));
 	} catch {
 		return [];
 	} finally {

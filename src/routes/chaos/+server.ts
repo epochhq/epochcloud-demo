@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { errorsTotal } from '$lib/server/metrics.js';
+import { errorsTotal } from '#lib/server/metrics.js';
 
 // In-memory degradation counter (per process)
 let degradeCounter = 0;
@@ -235,10 +235,7 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 
 	if (action === 'degrade') {
 		degradeCounter++;
-		const maxRequests = Math.min(
-			Math.max(parseInt(url.searchParams.get('requests') || '10'), 2),
-			50
-		);
+		const maxRequests = Math.min(Math.max(parseInt(url.searchParams.get('requests') || '10'), 2), 50);
 		// Delay grows linearly: 0ms at request 1, up to 5000ms at maxRequests
 		const delay = Math.round(Math.min(degradeCounter / maxRequests, 1) * 5000);
 		await new Promise((resolve) => setTimeout(resolve, delay));
@@ -267,21 +264,7 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	return json(
 		{
 			error: 'Unknown action',
-			available: [
-				'error',
-				'error502',
-				'error503',
-				'slow',
-				'jitter',
-				'timeout',
-				'cpu',
-				'memory',
-				'load',
-				'flaky',
-				'cascade',
-				'degrade',
-				'degrade-reset'
-			],
+			available: ['error', 'error502', 'error503', 'slow', 'jitter', 'timeout', 'cpu', 'memory', 'load', 'flaky', 'cascade', 'degrade', 'degrade-reset'],
 			timestamp: new Date().toISOString()
 		},
 		400

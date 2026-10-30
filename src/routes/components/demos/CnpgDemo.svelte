@@ -1,14 +1,12 @@
 <script lang="ts">
-	import StatusIcon from '$lib/components/StatusIcon.svelte';
+	import StatusIcon from '#lib/components/StatusIcon.svelte';
 
 	let { enabled, environment }: { enabled: boolean; environment: string } = $props();
 
 	let statusText = $state('Not checked');
 	let statusOk = $state(false);
 	let newItemText = $state('');
-	let items = $state<
-		Array<{ id: number; text: string; originated_in: string; created_at: string }>
-	>([]);
+	let items = $state<Array<{ id: number; text: string; originated_in: string; created_at: string }>>([]);
 	let itemsLoaded = $state(false);
 	let result = $state('');
 	let resultOk = $state(false);
@@ -107,8 +105,14 @@
 		<span class="card-tag">Database</span>
 	</div>
 	<div class="status-row">
-		<button onclick={checkStatus} class="btn btn-outline btn-sm">Check Status</button>
-		<StatusIcon ok={statusOk} checked={statusText !== 'Not checked'} />
+		<button
+			onclick={checkStatus}
+			class="btn btn-outline btn-sm">Check Status</button
+		>
+		<StatusIcon
+			ok={statusOk}
+			checked={statusText !== 'Not checked'}
+		/>
 		<span class="status-text">{statusText}</span>
 		<span class="env-pill">env: {environment}</span>
 	</div>
@@ -126,14 +130,19 @@
 						onkeydown={(e) => e.key === 'Enter' && createItem()}
 					/>
 				</div>
-				<button onclick={createItem} class="btn btn-primary btn-sm w-full">Create</button>
+				<button
+					onclick={createItem}
+					class="btn btn-primary btn-sm w-full">Create</button
+				>
 			</div>
 			<div class="form-col">
 				<span class="form-label">Items</span>
-				<button onclick={loadItems} class="btn btn-secondary btn-sm w-full">Refresh</button>
+				<button
+					onclick={loadItems}
+					class="btn btn-secondary btn-sm w-full">Refresh</button
+				>
 				<p class="hint">
-					When env-isolation lands, prod / staging / dev each have their own DB; PR previews
-					share the dev DB. Compare these lists across envs to see isolation.
+					When env-isolation lands, prod / staging / dev each have their own DB; PR previews share the dev DB. Compare these lists across envs to see isolation.
 				</p>
 			</div>
 		</div>
@@ -146,7 +155,10 @@
 						<li class="item">
 							<span class="item-id">#{item.id}</span>
 							<span class="item-text">{item.text}</span>
-							<span class="item-origin" title="originated_in column">
+							<span
+								class="item-origin"
+								title="originated_in column"
+							>
 								{item.originated_in}
 							</span>
 							<span class="item-time">{new Date(item.created_at).toLocaleString()}</span>
@@ -163,7 +175,13 @@
 			{/if}
 		{/if}
 		{#if resultVisible}
-			<p class="result" class:ok={resultOk} class:err={!resultOk}>{result}</p>
+			<p
+				class="result"
+				class:ok={resultOk}
+				class:err={!resultOk}
+			>
+				{result}
+			</p>
 		{/if}
 	{:else}
 		<p class="disabled-msg">Not configured - DATABASE_URL not set</p>

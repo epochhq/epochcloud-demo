@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { getCnpgStatus } from '$lib/server/cnpg.js';
+import { getCnpgStatus } from '#lib/server/cnpg.js';
 
 export const GET: RequestHandler = async () => {
 	const status = getCnpgStatus();

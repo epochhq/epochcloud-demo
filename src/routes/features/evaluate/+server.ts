@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { config } from '$lib/server/config.js';
+import { config } from '#lib/server/config.js';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const timestamp = new Date().toISOString();
@@ -19,21 +19,18 @@ export const GET: RequestHandler = async ({ url }) => {
 	}
 
 	try {
-		const resp = await fetch(
-			`${config.gofeatureflag.url}/v1/feature/${encodeURIComponent(flagName)}/eval`,
-			{
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					evaluationContext: {
-						targetingKey: userId,
-						environment: config.environment
-					},
-					defaultValue: false
-				}),
-				signal: AbortSignal.timeout(5000)
-			}
-		);
+		const resp = await fetch(`${config.gofeatureflag.url}/v1/feature/${encodeURIComponent(flagName)}/eval`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				evaluationContext: {
+					targetingKey: userId,
+					environment: config.environment
+				},
+				defaultValue: false
+			}),
+			signal: AbortSignal.timeout(5000)
+		});
 
 		const result = await resp.json();
 

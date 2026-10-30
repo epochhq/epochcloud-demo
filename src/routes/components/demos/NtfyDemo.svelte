@@ -1,5 +1,5 @@
 <script lang="ts">
-	import StatusIcon from '$lib/components/StatusIcon.svelte';
+	import StatusIcon from '#lib/components/StatusIcon.svelte';
 
 	let { enabled }: { enabled: boolean } = $props();
 
@@ -56,16 +56,41 @@
 		<span class="card-tag">Push Notifications</span>
 	</div>
 	<div class="status-row">
-		<button onclick={checkStatus} class="btn btn-outline btn-sm">Check Status</button>
-		<StatusIcon ok={statusOk} checked={statusText !== 'Not checked'} />
+		<button
+			onclick={checkStatus}
+			class="btn btn-outline btn-sm">Check Status</button
+		>
+		<StatusIcon
+			ok={statusOk}
+			checked={statusText !== 'Not checked'}
+		/>
 		<span class="status-text">{statusText}</span>
 	</div>
 	{#if enabled}
-		<input type="text" bind:value={topic} placeholder="Topic" class="input" />
-		<input type="text" bind:value={message} placeholder="Message (optional)" class="input" />
-		<button onclick={send} class="btn btn-primary btn-sm w-full">Send Notification</button>
+		<input
+			type="text"
+			bind:value={topic}
+			placeholder="Topic"
+			class="input"
+		/>
+		<input
+			type="text"
+			bind:value={message}
+			placeholder="Message (optional)"
+			class="input"
+		/>
+		<button
+			onclick={send}
+			class="btn btn-primary btn-sm w-full">Send Notification</button
+		>
 		{#if resultVisible}
-			<p class="result" class:ok={resultOk} class:err={!resultOk}>{result}</p>
+			<p
+				class="result"
+				class:ok={resultOk}
+				class:err={!resultOk}
+			>
+				{result}
+			</p>
 		{/if}
 	{:else}
 		<p class="disabled-msg">Not configured - NTFY_URL not set</p>

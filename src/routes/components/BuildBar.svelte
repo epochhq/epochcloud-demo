@@ -72,7 +72,10 @@
 			<span class="build-sep"></span>
 			<div class="build-item">
 				<span class="build-label">Built</span>
-				<span class="build-value" title={buildTime}>{formatBuildAge(buildTime)}</span>
+				<span
+					class="build-value"
+					title={buildTime}>{formatBuildAge(buildTime)}</span
+				>
 			</div>
 			<span class="build-sep"></span>
 			<div class="build-item">
@@ -82,9 +85,7 @@
 			<span class="build-sep"></span>
 			<div class="build-item">
 				<span class="build-label">Environment</span>
-				<span class="build-value"
-					><span class="build-env-badge badge-{environment}">{environment}</span></span
-				>
+				<span class="build-value"><span class="build-env-badge badge-{environment}">{environment}</span></span>
 			</div>
 		</div>
 	</div>

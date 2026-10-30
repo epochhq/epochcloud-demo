@@ -1,13 +1,13 @@
 import type { RequestHandler } from './$types';
-import { config } from '$lib/server/config.js';
-import { log } from '$lib/server/logger.js';
+import { config } from '#lib/server/config.js';
+import { log } from '#lib/server/logger.js';
 
 export const POST: RequestHandler = async ({ request }) => {
 	if (!config.ntfy.enabled) {
-		return new Response(
-			JSON.stringify({ success: false, error: 'ntfy not configured (NTFY_URL not set)' }),
-			{ status: 503, headers: { 'Content-Type': 'application/json' } }
-		);
+		return new Response(JSON.stringify({ success: false, error: 'ntfy not configured (NTFY_URL not set)' }), {
+			status: 503,
+			headers: { 'Content-Type': 'application/json' }
+		});
 	}
 
 	try {
@@ -53,10 +53,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			);
 		} else {
 			const errText = await resp.text();
-			return new Response(
-				JSON.stringify({ success: false, error: `ntfy error: ${resp.status} ${errText}` }),
-				{ status: 500, headers: { 'Content-Type': 'application/json' } }
-			);
+			return new Response(JSON.stringify({ success: false, error: `ntfy error: ${resp.status} ${errText}` }), {
+				status: 500,
+				headers: { 'Content-Type': 'application/json' }
+			});
 		}
 	} catch (err) {
 		log('error', 'ntfy send error', { error: String(err) });

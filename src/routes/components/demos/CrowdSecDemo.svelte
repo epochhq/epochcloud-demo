@@ -1,5 +1,5 @@
 <script lang="ts">
-	import StatusIcon from '$lib/components/StatusIcon.svelte';
+	import StatusIcon from '#lib/components/StatusIcon.svelte';
 
 	let { enabled }: { enabled: boolean } = $props();
 
@@ -29,9 +29,7 @@
 			const resp = await fetch(`/crowdsec/decisions?ip=${encodeURIComponent(ip)}`);
 			const d = await resp.json();
 			if (d.success) {
-				result = d.blocked
-					? `BLOCKED - ${d.decisions.length} decision(s)`
-					: 'Clean - no active decisions';
+				result = d.blocked ? `BLOCKED - ${d.decisions.length} decision(s)` : 'Clean - no active decisions';
 				resultOk = !d.blocked;
 			} else {
 				result = d.error;
@@ -56,17 +54,37 @@
 		<span class="card-tag">Threat Intel</span>
 	</div>
 	<div class="status-row">
-		<button onclick={checkStatus} class="btn btn-outline btn-sm">Check Status</button>
-		<StatusIcon ok={statusOk} checked={statusText !== 'Not checked'} />
+		<button
+			onclick={checkStatus}
+			class="btn btn-outline btn-sm">Check Status</button
+		>
+		<StatusIcon
+			ok={statusOk}
+			checked={statusText !== 'Not checked'}
+		/>
 		<span class="status-text">{statusText}</span>
 	</div>
 	{#if enabled}
 		<div class="form-row">
-			<input type="text" bind:value={ip} placeholder="IP address" class="input" />
-			<button onclick={checkIp} class="btn btn-secondary btn-sm">Check IP</button>
+			<input
+				type="text"
+				bind:value={ip}
+				placeholder="IP address"
+				class="input"
+			/>
+			<button
+				onclick={checkIp}
+				class="btn btn-secondary btn-sm">Check IP</button
+			>
 		</div>
 		{#if resultVisible}
-			<p class="result" class:ok={resultOk} class:err={!resultOk}>{result}</p>
+			<p
+				class="result"
+				class:ok={resultOk}
+				class:err={!resultOk}
+			>
+				{result}
+			</p>
 		{/if}
 	{:else}
 		<p class="disabled-msg">Not configured - CROWDSEC_LAPI_URL not set</p>

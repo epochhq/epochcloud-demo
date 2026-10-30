@@ -87,10 +87,22 @@
 	</div>
 	<p class="card-desc">Counter &amp; in-flight are per-pod, HTTP total aggregated via Prometheus</p>
 	<div class="prom-controls">
-		<button onclick={() => loadPromMetrics(true)} class="btn btn-primary btn-sm">+1</button>
-		<button onclick={() => loadPromMetrics(true, 5)} class="btn btn-primary btn-sm">+5</button>
-		<button onclick={() => loadPromMetrics(true, 25)} class="btn btn-primary btn-sm">+25</button>
-		<button onclick={() => loadPromMetrics(false)} class="btn btn-outline btn-sm">Refresh</button>
+		<button
+			onclick={() => loadPromMetrics(true)}
+			class="btn btn-primary btn-sm">+1</button
+		>
+		<button
+			onclick={() => loadPromMetrics(true, 5)}
+			class="btn btn-primary btn-sm">+5</button
+		>
+		<button
+			onclick={() => loadPromMetrics(true, 25)}
+			class="btn btn-primary btn-sm">+25</button
+		>
+		<button
+			onclick={() => loadPromMetrics(false)}
+			class="btn btn-outline btn-sm">Refresh</button
+		>
 		<button
 			class="btn btn-sm"
 			class:btn-outline={!promLive}
@@ -114,11 +126,7 @@
 			<div class="prom-stat">
 				<span class="prom-val">{promHttpTotal.toLocaleString()}</span>
 				<span class="prom-label">HTTP Total</span>
-				<span class="prom-scope"
-					>{promSource === 'prometheus' ? 'all pods' : 'this pod'}{promRate > 0
-						? ` · +${promRate}`
-						: ''}</span
-				>
+				<span class="prom-scope">{promSource === 'prometheus' ? 'all pods' : 'this pod'}{promRate > 0 ? ` · +${promRate}` : ''}</span>
 			</div>
 			<div class="prom-stat">
 				<span class="prom-val">{promActive}</span>
@@ -126,7 +134,10 @@
 				<span class="prom-scope">this pod</span>
 			</div>
 			<div class="prom-stat">
-				<span class="prom-val" class:prom-val-err={promErrors > 0}>{promErrors}</span>
+				<span
+					class="prom-val"
+					class:prom-val-err={promErrors > 0}>{promErrors}</span
+				>
 				<span class="prom-label">Errors</span>
 				<span class="prom-scope">this pod</span>
 			</div>
@@ -142,15 +153,10 @@
 							<div class="prom-pct-bar">
 								<div
 									class="prom-pct-fill"
-									style="width: {Math.min(
-										(pct.val / Math.max(promLatency.p99, 0.001)) * 100,
-										100
-									)}%"
+									style="width: {Math.min((pct.val / Math.max(promLatency.p99, 0.001)) * 100, 100)}%"
 								></div>
 							</div>
-							<span class="prom-pct-val"
-								>{pct.val < 1 ? `${(pct.val * 1000).toFixed(0)}ms` : `${pct.val.toFixed(2)}s`}</span
-							>
+							<span class="prom-pct-val">{pct.val < 1 ? `${(pct.val * 1000).toFixed(0)}ms` : `${pct.val.toFixed(2)}s`}</span>
 						</div>
 					{/each}
 				</div>
@@ -161,7 +167,7 @@
 			<div class="prom-status-section">
 				<span class="prom-latency-title">Status Codes</span>
 				<div class="prom-status-codes">
-					{#each Object.entries(promStatusBreakdown).sort( ([a], [b]) => a.localeCompare(b) ) as [code, count] (code)}
+					{#each Object.entries(promStatusBreakdown).sort(([a], [b]) => a.localeCompare(b)) as [code, count] (code)}
 						<div
 							class="prom-status-chip"
 							class:status-2xx={code.startsWith('2')}
@@ -194,9 +200,7 @@
 		<div class="prom-meta">
 			<span class="prom-meta-item">Pod: {promPod}</span>
 			<span class="prom-meta-item">Source: {promSource}</span>
-			<span class="prom-meta-item"
-				>Updated: {promLastUpdated}{promAgo > 0 ? ` (${promAgo}s ago)` : ''}</span
-			>
+			<span class="prom-meta-item">Updated: {promLastUpdated}{promAgo > 0 ? ` (${promAgo}s ago)` : ''}</span>
 		</div>
 	{/if}
 </div>

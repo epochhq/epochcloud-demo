@@ -1,4 +1,4 @@
-import type { ClientInit } from '@sveltejs/kit';
+import type { ClientInit } from '@sveltejs/kit/hooks';
 
 export const init: ClientInit = async () => {
 	const meta = document.querySelector('meta[name="faro-config"]');
@@ -7,7 +7,7 @@ export const init: ClientInit = async () => {
 	const faroConfig = JSON.parse(meta.getAttribute('content') || '{}');
 	if (!faroConfig.enabled) return;
 
-	const { setupFaro } = await import('$lib/faro');
+	const { setupFaro } = await import('#lib/faro.js');
 	setupFaro({
 		version: faroConfig.version,
 		environment: faroConfig.environment

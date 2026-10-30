@@ -12,7 +12,6 @@
 // mounted.
 
 import { readFileSync } from 'node:fs';
-import { env } from '$env/dynamic/private';
 
 /**
  * Resolves a secret from the file named by `<name>_FILE`, falling back to the
@@ -29,8 +28,8 @@ import { env } from '$env/dynamic/private';
  * verbatim.
  */
 export function readSecret(name: string): string | undefined {
-	const path = env[`${name}_FILE`];
-	if (!path) return env[name];
+	const path = process.env[`${name}_FILE`];
+	if (!path) return process.env[name];
 	try {
 		return readFileSync(path, 'utf8').replace(/\n$/, '');
 	} catch (err) {

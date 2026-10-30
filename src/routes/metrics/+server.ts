@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { registry } from '$lib/server/metrics.js';
+import { registry } from '#lib/server/metrics.js';
 
 export const GET: RequestHandler = async () => {
 	const metrics = await registry.metrics();

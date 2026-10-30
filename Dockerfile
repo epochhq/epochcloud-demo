@@ -1,68 +1,30 @@
-# Build stage
-FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea AS builder
-
-# git is needed by `vite build`: vite.config.ts stamps the build commit from the
-# checked-out .git via `git rev-parse`. Stamping the commit through git (not a
-# Docker --build-arg) keeps it out of every layer's cache key - a per-commit
-# build-arg value would force a permanent cold dependency rebuild. node:alpine
-# ships no git, so install it here (builder stage only; the runtime stage stays slim).
-RUN apk --no-cache add git
-
+FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS dependencies
 WORKDIR /app
+COPY package.json bun.lock bunfig.toml ./
+RUN bun install --frozen-lockfile --ignore-scripts
 
-# Copy package files. pnpm-workspace.yaml is required for pnpm 11+ -
-# it holds the `allowBuilds` decisions without which `pnpm install`
-# hard-fails in non-TTY (CI) with ERR_PNPM_IGNORED_BUILDS.
-COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+FROM node:24.22.1-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS node-tooling
 
-# Install the exact pnpm version pinned in package.json's packageManager field,
-# via npm and WITHOUT corepack. Two hard constraints, both learned the hard way
-# (see git history - do NOT reintroduce corepack here):
-#  1. PROXY: build pods are egress-default-deny with a forward proxy injected via
-#     env. corepack fetches pnpm with Node's built-in fetch, which ignores
-#     HTTP_PROXY and NODE_USE_ENV_PROXY (commits 0d0710e, a3a23ef), so
-#     `corepack install` dials registry.npmjs.org directly and the CNI drops it.
-#     npm honors the proxy natively, so it is the only fetcher that works here.
-#  2. NO SHIM COLLISION: we previously also ran `corepack enable`, which writes a
-#     /usr/local/bin/pnpm shim, and this npm install then died with
-#     "EEXIST: /usr/local/bin/pnpm" - the build's actual failure. corepack is
-#     unused once pnpm is npm-installed, so it is removed entirely; --force keeps
-#     this install idempotent against any pnpm shim a future base image ships.
-RUN npm install -g --force "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
-
-# Install dependencies (no --frozen-lockfile: survives Renovate lockfile lag between packageManager bumps)
-RUN pnpm install
-
-# Copy source (includes .git, which `vite build` reads for the build commit).
+FROM dependencies AS builder
+COPY --from=node-tooling /usr/local/bin/node /usr/local/bin/node
+USER root
+# The build reads git metadata without a per-commit dependency-layer cache key.
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 COPY . .
+RUN node -e 'if (process.versions.node !== require("./package.json").engines.node) throw new Error("Node tooling version differs from package.json")' && bun run build
 
-# Build. version / commit / build-time are stamped here by vite.config.ts's
-# `define` (VERSION file + `git rev-parse` + build timestamp), NOT via
-# --build-arg - see the git note in the builder stage above.
-RUN pnpm build
-
-# Prune dev dependencies
-RUN pnpm prune --prod
-
-# Runtime stage
-FROM docker.io/library/node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea
-
-# Install ca-certificates for HTTPS
-RUN apk --no-cache add ca-certificates
-
+FROM oven/bun:1.4.4-alpine@sha256:4cf82f5686b196504fe119db3fcd9185b191f82ece82c40680e597228ec6070a AS production-dependencies
 WORKDIR /app
+COPY package.json bun.lock bunfig.toml ./
+RUN bun install --frozen-lockfile --production --ignore-scripts
 
-# Copy built app and production dependencies
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
-
-# Non-root user (node:22-alpine already has 'node' user at uid 1000)
-USER node
-
+FROM oven/bun:1.4.4-alpine@sha256:4cf82f5686b196504fe119db3fcd9185b191f82ece82c40680e597228ec6070a
+WORKDIR /app
+COPY --from=builder --chown=bun:bun /app/build ./build
+COPY --from=production-dependencies --chown=bun:bun /app/node_modules ./node_modules
+COPY --chown=bun:bun package.json runtime-check.js ./
+USER bun
 EXPOSE 3000
-
 ENV NODE_ENV=production
 ENV PORT=3000
-
-CMD ["node", "build"]
+CMD ["bun", "--preload", "./runtime-check.js", "./build/index.js"]

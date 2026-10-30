@@ -1,6 +1,6 @@
 <script lang="ts">
-	import FlowCard from '$lib/components/flow/FlowCard.svelte';
-	import type { FlowAccent } from '$lib/components/flow/FlowNode.svelte';
+	import FlowCard from '#lib/components/flow/FlowCard.svelte';
+	import type { FlowAccent } from '#lib/components/flow/FlowNode.svelte';
 
 	// Security model as a full defense-in-depth view. Five layers, each verified
 	// against platform-identity, platform-network, platform-security,
@@ -75,7 +75,11 @@
 	];
 </script>
 
-<FlowCard title="How Security Layers" badge="Defense in depth" gap="1rem">
+<FlowCard
+	title="How Security Layers"
+	badge="Defense in depth"
+	gap="1rem"
+>
 	<div class="sec-grid">
 		{#each layers as layer (layer.tag)}
 			<div class="sec-layer flow-accent-{layer.accent}">
@@ -93,9 +97,8 @@
 	</div>
 
 	{#snippet note()}
-		Five layers, each independent. Identity and secrets gate access, the mesh encrypts and
-		segments every hop, supply-chain gates stop unsigned or unattested images at admission, runtime
-		sensors watch live workloads, and every signal lands in DefectDojo for triage on an SLA.
+		Five layers, each independent. Identity and secrets gate access, the mesh encrypts and segments every hop, supply-chain gates stop unsigned or unattested
+		images at admission, runtime sensors watch live workloads, and every signal lands in DefectDojo for triage on an SLA.
 	{/snippet}
 </FlowCard>
 

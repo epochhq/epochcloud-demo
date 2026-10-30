@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { config } from '$lib/server/config.js';
+import { config } from '#lib/server/config.js';
 
 export const GET: RequestHandler = async ({ url }) => {
 	if (!config.crowdsec.enabled) {
@@ -28,12 +28,9 @@ export const GET: RequestHandler = async ({ url }) => {
 	}
 
 	try {
-		const resp = await fetch(
-			`${config.crowdsec.lapiUrl}/v1/decisions?ip=${encodeURIComponent(ip)}`,
-			{
-				headers: { 'X-Api-Key': config.crowdsec.bouncerKey }
-			}
-		);
+		const resp = await fetch(`${config.crowdsec.lapiUrl}/v1/decisions?ip=${encodeURIComponent(ip)}`, {
+			headers: { 'X-Api-Key': config.crowdsec.bouncerKey }
+		});
 
 		if (resp.status === 200) {
 			const decisions = await resp.json();
@@ -60,10 +57,10 @@ export const GET: RequestHandler = async ({ url }) => {
 				{ headers: { 'Content-Type': 'application/json' } }
 			);
 		} else {
-			return new Response(
-				JSON.stringify({ success: false, error: `LAPI returned ${resp.status}` }),
-				{ status: 500, headers: { 'Content-Type': 'application/json' } }
-			);
+			return new Response(JSON.stringify({ success: false, error: `LAPI returned ${resp.status}` }), {
+				status: 500,
+				headers: { 'Content-Type': 'application/json' }
+			});
 		}
 	} catch (err) {
 		return new Response(JSON.stringify({ success: false, error: String(err) }), {

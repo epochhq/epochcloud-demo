@@ -19,7 +19,10 @@
 	} = $props();
 </script>
 
-<div class="flow-node flow-accent-{accent}" class:emphasis>
+<div
+	class="flow-node flow-accent-{accent}"
+	class:emphasis
+>
 	<span class="flow-node-label">{label}</span>
 	{#if sub}<span class="flow-node-sub">{sub}</span>{/if}
 	{#if extra}{@render extra()}{/if}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import StatusIcon from '$lib/components/StatusIcon.svelte';
+	import StatusIcon from '#lib/components/StatusIcon.svelte';
 
 	let { enabled, domain }: { enabled: boolean; domain: string } = $props();
 
@@ -45,15 +45,23 @@
 		<span class="card-tag">Security</span>
 	</div>
 	<div class="status-row">
-		<button onclick={checkStatus} class="btn btn-outline btn-sm">Check Status</button>
-		<StatusIcon ok={statusOk} checked={statusText !== 'Not checked'} />
+		<button
+			onclick={checkStatus}
+			class="btn btn-outline btn-sm">Check Status</button
+		>
+		<StatusIcon
+			ok={statusOk}
+			checked={statusText !== 'Not checked'}
+		/>
 		<span class="status-text">{statusText}</span>
 	</div>
 	{#if findings}
 		<div class="findings-grid">
 			{#each Object.entries(findings.by_severity) as [sev, count] (sev)}
 				<div class="finding-item">
-					<span class="finding-dot" style="background:{severityColors[sev] || 'var(--muted-fg)'}"
+					<span
+						class="finding-dot"
+						style="background:{severityColors[sev] || 'var(--muted-fg)'}"
 					></span>
 					<span class="finding-label">{sev}</span>
 					<span class="finding-count">{count}</span>

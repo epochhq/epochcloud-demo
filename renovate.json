@@ -1,3 +1,103 @@
 {
-  "lockFileMaintenance": { "enabled": true }
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"lockFileMaintenance": {
+		"enabled": true
+	},
+	"minimumReleaseAge": "14 days",
+	"minimumReleaseAgeBehaviour": "timestamp-required",
+	"internalChecksFilter": "strict",
+	"vulnerabilityAlerts": {
+		"minimumReleaseAge": "14 days",
+		"minimumReleaseAgeBehaviour": "timestamp-required",
+		"internalChecksFilter": "strict"
+	},
+	"packageRules": [
+		{
+			"description": "Update runtime archive URLs with native Nix hash regeneration.",
+			"matchManagers": ["custom.regex"],
+			"matchFileNames": ["flake.nix"],
+			"matchPackageNames": ["oven-sh/bun", "node"],
+			"minimumReleaseAge": "14 days",
+			"autoReplaceGlobalMatch": true,
+			"constraints": {
+				"nix": "2.35.2"
+			},
+			"postUpgradeTasks": {
+				"commands": ["nix --extra-experimental-features 'nix-command flakes' flake lock"],
+				"fileFilters": ["flake.lock"],
+				"executionMode": "update",
+				"installTools": {
+					"nix": {}
+				}
+			}
+		},
+		{
+			"description": "Keep tooling on the supported Node LTS line.",
+			"matchPackageNames": ["node"],
+			"matchFileNames": ["package.json", "flake.nix", "Dockerfile"],
+			"allowedVersions": "/^v?24\\./"
+		},
+		{
+			"description": "Keep canonical versions, runtime archives and the application image in one update.",
+			"matchPackageNames": ["bun", "node", "oven-sh/bun", "oven/bun"],
+			"matchFileNames": ["package.json", "flake.nix", "Dockerfile"],
+			"groupName": "javascript runtimes"
+		},
+		{
+			"description": "Nix installer tool updates observe the shared release waiting period.",
+			"matchPackageNames": ["containerbase/nix-prebuild"],
+			"minimumReleaseAge": "14 days"
+		},
+		{
+			"description": "Exact Bun compromised-key security release; future versions retain the fourteen-day wait.",
+			"matchPackageNames": ["bun", "oven/bun", "oven-sh/bun"],
+			"matchJsonata": [
+				"($candidate := ($exists(newValue) ? newValue : version); $type($candidate) = 'string' ? $boolean($match($candidate, /^1\\.4\\.4(?:-slim|-alpine)?$/)) : false)"
+			],
+			"minimumReleaseAge": "0 days"
+		},
+		{
+			"description": "Exact Node security release, including OpenSSL3.5.9; future versions retain the fourteen-day wait.",
+			"matchPackageNames": ["node"],
+			"matchJsonata": [
+				"($candidate := ($exists(newValue) ? newValue : (datasource = 'node-version' and $type(version) = 'string' ? $replace(version, /^v/, '') : version)); $type($candidate) = 'string' ? $boolean($match($candidate, /^24\\.22\\.1(?:-trixie-slim)?$/)) : false)"
+			],
+			"minimumReleaseAge": "0 days"
+		},
+		{
+			"description": "Exact SMTP address-parser security release; future versions retain the fourteen-day wait.",
+			"matchPackageNames": ["nodemailer"],
+			"matchJsonata": [
+				"($candidate := ($exists(newValue) ? newValue : version); $type($candidate) = 'string' ? $boolean($match($candidate, /^10\\.1\\.4$/)) : false)"
+			],
+			"minimumReleaseAge": "0 days"
+		}
+	],
+	"customManagers": [
+		{
+			"customType": "regex",
+			"description": "Track official Bun runtime archives; Nix owns their hashes in flake.lock.",
+			"managerFilePatterns": ["/^flake\\.nix$/"],
+			"matchStrings": ["file\\+https://github\\.com/oven-sh/bun/releases/download/bun-v(?<currentValue>\\d+\\.\\d+\\.\\d+)/bun-[^\"\\s]+\\.zip"],
+			"depNameTemplate": "oven-sh/bun",
+			"datasourceTemplate": "github-releases",
+			"extractVersionTemplate": "^bun-v(?<version>\\d+\\.\\d+\\.\\d+)$"
+		},
+		{
+			"customType": "regex",
+			"description": "Track official Node runtime archives; Nix owns their hashes in flake.lock.",
+			"managerFilePatterns": ["/^flake\\.nix$/"],
+			"matchStrings": ["file\\+https://nodejs\\.org/dist/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/node-v[^\"\\s]+\\.tar\\.xz"],
+			"depNameTemplate": "node",
+			"datasourceTemplate": "node-version"
+		},
+		{
+			"customType": "regex",
+			"description": "Track the Nix tool version available to containerbase for native lock regeneration.",
+			"managerFilePatterns": ["/^renovate\\.json$/"],
+			"matchStrings": ["\"nix\":\\s*\"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],
+			"depNameTemplate": "containerbase/nix-prebuild",
+			"datasourceTemplate": "github-releases"
+		}
+	]
 }
