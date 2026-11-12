@@ -30,10 +30,13 @@ it('substitutes the namespace matcher and the service name exactly, and refuses 
 	PROOFS.forEach((proof, i) => {
 		const query = queries[i] ?? '';
 		expect(query, proof.id).not.toMatch(/NSNAME|\{NS|NS\}/);
-		if (proof.query.includes('NSNAME')) {
+		if (proof.query.includes('exported_service=')) {
 			// every occurrence is the full service name with the namespace in it
 			expect(query, proof.id).toContain(service);
 			expect(query.split(service).length - 1, proof.id).toBe(proof.query.split('exported_service=').length - 1);
+		} else if (proof.query.includes('NSNAME')) {
+			// the destination namespace of Traefik's own outbound series
+			expect(query, proof.id).toContain('dst_namespace="epochcloud-demo-dev"');
 		} else {
 			expect(query, proof.id).toContain('{namespace="epochcloud-demo-dev"');
 		}

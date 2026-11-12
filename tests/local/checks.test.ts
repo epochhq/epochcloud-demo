@@ -14,16 +14,42 @@ import { refresh, snapshotResponse } from '../../src/lib/server/snapshot.js';
 
 // The Linkerd tab's check, against a fake Prometheus that holds series with the
 // label shapes the live proxies expose and applies the query's label matchers
-// to them. An mTLS series from Traefik's identity to the app's pods is the pass.
-// The proxy also creates default-policy series (plaintext, "all-unauthenticated",
-// "default" route) at start-up, with a count of 1 to 6, and the BetterAuth pods
-// share port 3000 in the namespace: neither is evidence against the mesh.
+// to them. The evidence is Traefik's own proxy: its outbound request_total
+// series toward the app carry the destination (dst_namespace and
+// dst_serviceaccount) and tls. The server side of the app is not read: the proxy
+// creates default-policy series (plaintext, "all-unauthenticated", "default"
+// route) at start-up, and the BetterAuth pods share port 3000 in the namespace.
 
 type Labels = Record<string, string>;
 const NAMESPACE = 'epochcloud-demo-dev';
 const TRAEFIK = 'traefik.traefik.serviceaccount.identity.linkerd.cluster.local';
 
-const proxySeries = (pod: string, extra: Labels = {}): Labels => ({
+/** A series Traefik's proxy exports for requests it sends toward a destination (live label shape). */
+const outbound = (dst: { namespace: string; serviceaccount: string; pod: string }, extra: Labels = {}): Labels => ({
+	direction: 'outbound',
+	dst_control_plane_ns: 'linkerd',
+	dst_namespace: dst.namespace,
+	dst_pod: dst.pod,
+	dst_replicaset: dst.pod.replace(/-[a-z0-9]{5}$/, ''),
+	dst_serviceaccount: dst.serviceaccount,
+	instance: '10.244.0.123:4191',
+	job: 'linkerd-proxy',
+	namespace: 'traefik',
+	pod: 'traefik-stpg2',
+	server_id: `${dst.serviceaccount}.${dst.namespace}.serviceaccount.identity.linkerd.cluster.local`,
+	target_addr: '10.244.5.58:3000',
+	target_ip: '10.244.5.58',
+	target_port: '3000',
+	tls: 'true',
+	...extra
+});
+const toApp = (extra: Labels = {}, namespace = NAMESPACE) =>
+	outbound({ namespace, serviceaccount: 'epochcloud-demo', pod: 'epochcloud-demo-c888dc596-mw77d' }, extra);
+const toBetterauth = (extra: Labels = {}) =>
+	outbound({ namespace: NAMESPACE, serviceaccount: 'epochcloud-demo-betterauth', pod: 'epochcloud-demo-betterauth-bd44b6d7f-kd2th' }, extra);
+
+/** A series a meshed pod's own proxy exports for requests it receives (live label shape). */
+const inbound = (pod: string, extra: Labels = {}): Labels => ({
 	authz_kind: 'default',
 	authz_name: 'all-unauthenticated',
 	direction: 'inbound',
@@ -39,19 +65,14 @@ const proxySeries = (pod: string, extra: Labels = {}): Labels => ({
 	tls: 'no_identity',
 	...extra
 });
-const defaultPolicy = (pod: string) => proxySeries(pod);
-const fromTraefik = (pod: string): Labels => {
-	const { no_tls_reason: _reason, ...rest } = proxySeries(pod, { tls: 'true', client_id: TRAEFIK });
-	return rest;
-};
+const defaultPolicyOnNewAppPod = () => inbound('epochcloud-demo-64579cf5cf-2sbqz');
+const defaultPolicyOnBetterauthPod = () => inbound('epochcloud-demo-betterauth-bd44b6d7f-kd2th');
+const inboundFromTraefik = () => inbound('epochcloud-demo-c888dc596-mw77d', { tls: 'true', client_id: TRAEFIK, no_tls_reason: '' });
 
-const appPod = 'epochcloud-demo-5d49b4bc48-qnc5d';
-const newAppPod = 'epochcloud-demo-64579cf5cf-2sbqz';
-const betterauthPod = 'epochcloud-demo-betterauth-bd44b6d7f-kd2th';
-
-/** The label matchers of a query, applied to a series; an absent label is empty, as in PromQL. */
+/** The label matchers of a query, applied to a series; an absent label is empty, as in PromQL. Refuses any operator it does not implement. */
 function selects(query: string, labels: Labels): boolean {
-	for (const [, name, op, raw] of query.matchAll(/(\w+)(=~|!=|=)"((?:[^"\\]|\\.)*)"/g)) {
+	for (const [, name, op, raw] of query.matchAll(/(\w+)\s*(=~|!~|!=|=)\s*"((?:[^"\\]|\\.)*)"/g)) {
+		if (op !== '=' && op !== '!=' && op !== '=~') throw new Error(`the fake Prometheus does not implement the ${op} matcher`);
 		const value = (raw ?? '').replaceAll('\\\\', '\\');
 		const actual = labels[name ?? ''] ?? '';
 		if (op === '=' && actual !== value) return false;
@@ -73,9 +94,14 @@ function prometheus(series: Labels[], failing = false) {
 
 beforeEach(() => vi.unstubAllGlobals());
 
-const NOT_RUNNING = { connected: false, state: 'not-running', reason: 'No request from Traefik reached the app over mTLS in the last 10 minutes' };
+const NOT_RUNNING = { connected: false, state: 'not-running', reason: 'No request from Traefik to the app in the last 10 minutes' };
 
-it('is not running, with 200, when the proxies have no mTLS series from Traefik', async () => {
+it('refuses a matcher operator it does not implement', () => {
+	expect(() => selects('count(last_over_time(request_total{tls!~"tru.*"}[10m]))', toApp())).toThrow('does not implement the !~ matcher');
+	expect(selects('request_total{tls="true",dst_namespace=~"epochcloud-demo-.*",direction!="inbound"}', toApp())).toBe(true);
+});
+
+it('is not running, with 200, when Traefik sent the app no request in the window', async () => {
 	prometheus([]);
 	await refresh('linkerd', 1_000);
 	const response = snapshotResponse('linkerd', 1_000);
@@ -83,41 +109,42 @@ it('is not running, with 200, when the proxies have no mTLS series from Traefik'
 	expect(await response.json()).toMatchObject(NOT_RUNNING);
 });
 
-it('does not fail on the default-policy series a new pod and a BetterAuth pod create, and is not running', async () => {
-	prometheus([defaultPolicy(newAppPod), defaultPolicy(betterauthPod)]);
+it('is not running, never failed, on the default-policy series a new pod and a BetterAuth pod create', async () => {
+	prometheus([defaultPolicyOnNewAppPod(), defaultPolicyOnBetterauthPod(), inboundFromTraefik()]);
 	await refresh('linkerd', 2_000);
 	const response = snapshotResponse('linkerd', 2_000);
 	expect(response.status).toBe(200);
 	expect(await response.json()).toMatchObject(NOT_RUNNING);
 });
 
-it('does not count an mTLS series from Traefik to the BetterAuth pods', async () => {
-	prometheus([fromTraefik(betterauthPod)]);
+it('does not count what Traefik sends to BetterAuth, or to the app of another environment', async () => {
+	prometheus([toBetterauth(), toBetterauth({ tls: 'no_identity' }), toApp({}, 'epochcloud-demo-prod'), toApp({ tls: 'no_identity' }, 'epochcloud-demo-prod')]);
 	await refresh('linkerd', 3_000);
-	expect(await snapshotResponse('linkerd', 3_000).json()).toMatchObject(NOT_RUNNING);
+	const response = snapshotResponse('linkerd', 3_000);
+	expect(response.status).toBe(200);
+	expect(await response.json()).toMatchObject(NOT_RUNNING);
 });
 
-it('does not count an mTLS series from another caller, or in another namespace', async () => {
-	prometheus([
-		proxySeries(appPod, { tls: 'true', client_id: 'kube-prometheus-stack-prometheus.monitoring.serviceaccount.identity.linkerd.cluster.local' }),
-		{ ...fromTraefik(appPod), namespace: 'epochcloud-demo-prod' }
-	]);
-	await refresh('linkerd', 3_500);
-	expect(await snapshotResponse('linkerd', 3_500).json()).toMatchObject(NOT_RUNNING);
-});
-
-it('is connected when an mTLS series from Traefik reaches an app pod, whatever default-policy series are around', async () => {
-	prometheus([defaultPolicy(newAppPod), defaultPolicy(betterauthPod), fromTraefik(appPod)]);
+it('is connected when Traefik sends the app requests over mTLS, whatever default-policy series are around', async () => {
+	prometheus([toApp(), defaultPolicyOnNewAppPod(), defaultPolicyOnBetterauthPod()]);
 	await refresh('linkerd', 4_000);
 	const response = snapshotResponse('linkerd', 4_000);
 	expect(response.status).toBe(200);
 	expect(await response.json()).toMatchObject({ connected: true, mtls_series_10m: 1 });
 });
 
-it('fails, with 503, only when the query does not answer', async () => {
-	prometheus([fromTraefik(appPod)], true);
+it.each(['no_identity', 'false'])('fails, with 503, when Traefik sent the app requests with tls %s, even beside mTLS series', async (tls) => {
+	prometheus([toApp(), toApp({ tls, no_tls_reason: 'no_tls_from_remote' })]);
 	await refresh('linkerd', 5_000);
 	const response = snapshotResponse('linkerd', 5_000);
+	expect(response.status).toBe(503);
+	expect(await response.json()).toMatchObject({ connected: false, error: 'the check failed' });
+});
+
+it('fails, with 503, when the queries do not answer', async () => {
+	prometheus([toApp()], true);
+	await refresh('linkerd', 6_000);
+	const response = snapshotResponse('linkerd', 6_000);
 	expect(response.status).toBe(503);
 	expect(await response.json()).toMatchObject({ connected: false, error: 'the check failed' });
 });

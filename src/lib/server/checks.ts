@@ -94,14 +94,16 @@ defineChecks([
 		}
 	},
 	{
-		// The mesh proof, judged by which series exist in the window. The proxy
-		// drops a series that stays idle and recreates it at 1 on the next
-		// request, so a counter's increase would read a request on a recreated
-		// series as none. A series from Traefik's identity over mTLS to the app's
-		// pods is the pass. None is Not running: no request came, or the proxies
-		// have no series for it yet. A plaintext series is no evidence against
-		// the mesh: the proxy creates default-policy series at start-up and other
-		// workloads share the port. Failed only when the query does not answer.
+		// The mesh proof, from the series of Traefik's own proxy toward the app
+		// (src/lib/server/proofs.ts). A series with tls "true" in the window is the
+		// pass; the proxy drops an idle series and recreates it at 1, so existence
+		// is the evidence, not an increase. A series toward the app with any other
+		// tls is positive evidence that the entrypoint reached it without mTLS:
+		// Failed. No series is Not running: no request came yet. The server side of
+		// the app is deliberately not read: the proxies create default-policy
+		// series at start-up and other workloads share the port, so a plaintext
+		// series there says nothing about the entrypoint's traffic. 503 also when
+		// the queries do not answer.
 		name: 'linkerd',
 		enabled: prometheusEnabled,
 		missing: 'Prometheus not configured',
@@ -110,9 +112,11 @@ defineChecks([
 			if (!namespace) throw new Error('namespace unknown');
 			const proofs = await evaluateProofs(namespace, 'linkerd');
 			const mtls = proofs.find((proof) => proof.id === 'mtls-traefik');
-			if (!mtls?.answered) throw new Error('Prometheus did not answer the mesh query');
+			const plaintext = proofs.find((proof) => proof.id === 'plaintext-traefik');
+			if (!mtls?.answered || !plaintext?.answered) throw new Error('Prometheus did not answer the mesh queries');
+			if (plaintext.value) throw new Error('Traefik reached the app without mTLS');
 			if (mtls.value) return { mtls_series_10m: Math.round(mtls.value) };
-			throw new NotRunning('No request from Traefik reached the app over mTLS in the last 10 minutes');
+			throw new NotRunning('No request from Traefik to the app in the last 10 minutes');
 		}
 	},
 	{

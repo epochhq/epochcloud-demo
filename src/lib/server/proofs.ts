@@ -80,19 +80,29 @@ export const PROOFS: Proof[] = [
 		traffic: true
 	},
 	{
-		// The proxy drops a series that stays idle and recreates it at 1 on the
-		// next request, so a counter's increase misses a request on a recreated
-		// series. A series that exists in the window is the evidence instead. The
-		// app's pods are told from the other workloads on port 3000 in the
-		// namespace (the BetterAuth pods) by their name: the Rollout's
-		// pod-template hash and a five character suffix.
+		// Traefik's own proxy counts every request it sends to the app, and labels
+		// the series with the destination (dst_namespace, dst_serviceaccount) and
+		// whether the connection used mTLS. The server side of the app (the
+		// proxies' default-policy series at start-up, the BetterAuth pods on the
+		// same port) is not in it. The proxy drops a series that stays idle and
+		// recreates it at 1, so a series that exists in the window is the
+		// evidence, not an increase.
 		id: 'mtls-traefik',
 		group: 'linkerd',
-		title: 'Request series from Traefik over mTLS in the last 10 minutes',
+		title: 'Traefik request series to the app over mTLS in the last 10 minutes',
 		query:
-			'count(last_over_time(request_total{NS,direction="inbound",srv_port="3000",pod=~"epochcloud-demo-[0-9a-f]{8,10}-[a-z0-9]{5}",tls="true",client_id=~"traefik\\\\.traefik\\\\..*"}[10m]))',
+			'count(last_over_time(request_total{namespace="traefik",direction="outbound",dst_namespace="NSNAME",dst_serviceaccount="epochcloud-demo",tls="true"}[10m]))',
 		unit: 'series',
 		traffic: true
+	},
+	{
+		id: 'plaintext-traefik',
+		group: 'linkerd',
+		title: 'Traefik request series to the app without mTLS in the last 10 minutes',
+		query:
+			'count(last_over_time(request_total{namespace="traefik",direction="outbound",dst_namespace="NSNAME",dst_serviceaccount="epochcloud-demo",tls!="true"}[10m])) or vector(0)',
+		unit: 'series',
+		healthy: { max: 0 }
 	},
 	{
 		id: 'inbound-callers',
