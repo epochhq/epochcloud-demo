@@ -1,0 +1,48 @@
+import { beforeEach, expect, it, vi } from 'vite-plus/test';
+import { defineChecks, refresh, resetSnapshots, snapshotResponse, tick } from '../../src/lib/server/snapshot.js';
+
+// The anonymous page reads a stored snapshot. These tests pin that a request
+// never triggers a check, that a failure is never reported as connected, and
+// that nothing internal leaks into the answer.
+
+const run = vi.fn();
+
+beforeEach(() => {
+	resetSnapshots();
+	run.mockReset().mockResolvedValue({ items: 3 });
+	defineChecks([{ name: 'db', enabled: () => true, missing: 'no db', run, everyMs: 30_000 }]);
+});
+
+it('serves the stored result and never runs a check because a request arrived', async () => {
+	expect(snapshotResponse('db').status).toBe(503);
+	await refresh('db', 1_000);
+	run.mockClear();
+	for (let i = 0; i < 5; i++) expect(snapshotResponse('db', 3_000).status).toBe(200);
+	expect(run).not.toHaveBeenCalled();
+	expect(await snapshotResponse('db', 3_000).json()).toMatchObject({ connected: true, items: 3, age_seconds: 2 });
+});
+
+it('refreshes on the schedule only: a check is due once its interval has passed', async () => {
+	await tick(100_000);
+	await tick(110_000);
+	expect(run).toHaveBeenCalledTimes(1);
+	await tick(131_000);
+	expect(run).toHaveBeenCalledTimes(2);
+});
+
+it('is not connected when the check throws, and shows a category rather than the raw error', async () => {
+	run.mockRejectedValue(new Error('connect ECONNREFUSED 10.1.2.3:5432'));
+	const snapshot = await refresh('db', 1_000);
+	expect(snapshot).toMatchObject({ connected: false, timeout: false, error: 'the check failed' });
+	const response = snapshotResponse('db', 1_000);
+	expect(response.status).toBe(503);
+	expect(JSON.stringify(await response.json())).not.toContain('10.1.2.3');
+});
+
+it('reports a timeout when the deadline passes while the check is still waiting', async () => {
+	run.mockImplementation(() => new Promise(() => {}));
+	const deadline = new AbortController();
+	const pending = refresh('db', 1_000, deadline.signal);
+	deadline.abort(new globalThis.DOMException('deadline', 'TimeoutError'));
+	expect(await pending).toMatchObject({ connected: false, timeout: true, error: 'timed out' });
+});

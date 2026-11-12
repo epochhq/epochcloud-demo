@@ -141,3 +141,11 @@ export const emailErrors = new client.Counter({
 
 // Collect default Node.js metrics (GC, event loop, memory, etc.)
 client.collectDefaultMetrics({ register: registry });
+
+// Demo counter - users increment it from the dashboard to watch Prometheus
+// scrape it. Defined here so every route reads the same instance.
+export const demoCounter = new client.Counter({
+	name: 'epochcloud_demo_counter_total',
+	help: 'Demo counter incremented by users from the dashboard',
+	registers: [registry]
+});

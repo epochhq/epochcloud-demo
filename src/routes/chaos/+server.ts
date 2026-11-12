@@ -1,5 +1,7 @@
 import type { RequestHandler } from './$types';
 import { errorsTotal } from '#lib/server/metrics.js';
+import { CHAOS_MAX_DELAY_MS } from '#lib/limits.js';
+import { guard } from '#lib/server/guard.js';
 
 // In-memory degradation counter (per process)
 let degradeCounter = 0;
@@ -10,8 +12,15 @@ const json = (data: Record<string, unknown>, status = 200) =>
 		headers: { 'Content-Type': 'application/json' }
 	});
 
-export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
-	const action = url.searchParams.get('action');
+// Fault injection runs inside this app and only for a signed-in user. Every
+// action is capped far below the pod's limits and below the server's idle
+// timeout, and none takes input beyond its own size or duration.
+export const POST: RequestHandler = async ({ request, fetch: svelteKitFetch }) => {
+	const auth = await guard(request, { write: true });
+	if ('refusal' in auth) return auth.refusal;
+	const params = new URLSearchParams();
+	for (const [key, value] of await request.formData()) if (typeof value === 'string') params.set(key, value);
+	const action = params.get('action');
 
 	// ═══════════════════════════════════════════════
 	// 1. ERROR INJECTION
@@ -58,7 +67,7 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	// ═══════════════════════════════════════════════
 
 	if (action === 'slow') {
-		const delay = Math.min(Math.max(parseInt(url.searchParams.get('delay') || '2000'), 100), 30000);
+		const delay = Math.min(Math.max(parseInt(params.get('delay') || '2000'), 100), CHAOS_MAX_DELAY_MS);
 		await new Promise((resolve) => setTimeout(resolve, delay));
 		return json({
 			message: `Slow response completed after ${delay}ms`,
@@ -69,8 +78,8 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	}
 
 	if (action === 'jitter') {
-		const min = Math.max(parseInt(url.searchParams.get('min') || '100'), 0);
-		const max = Math.min(parseInt(url.searchParams.get('max') || '5000'), 30000);
+		const min = Math.min(Math.max(parseInt(params.get('min') || '100'), 0), CHAOS_MAX_DELAY_MS);
+		const max = Math.min(parseInt(params.get('max') || '5000'), CHAOS_MAX_DELAY_MS);
 		const delay = Math.round(min + Math.random() * (max - min));
 		await new Promise((resolve) => setTimeout(resolve, delay));
 		return json({
@@ -84,12 +93,13 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	}
 
 	if (action === 'timeout') {
-		// 30s delay to trigger proxy/client timeouts
-		await new Promise((resolve) => setTimeout(resolve, 30000));
+		// The longest delay the server allows: longer than the client waits in
+		// the chaos panel, shorter than the server's idle timeout.
+		await new Promise((resolve) => setTimeout(resolve, CHAOS_MAX_DELAY_MS));
 		return json({
-			message: 'Timeout simulation completed (30s)',
+			message: `Timeout simulation completed (${CHAOS_MAX_DELAY_MS / 1000}s)`,
 			action: 'timeout',
-			delay_ms: 30000,
+			delay_ms: CHAOS_MAX_DELAY_MS,
 			timestamp: new Date().toISOString()
 		});
 	}
@@ -99,7 +109,7 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	// ═══════════════════════════════════════════════
 
 	if (action === 'cpu') {
-		const seconds = Math.min(Math.max(parseInt(url.searchParams.get('seconds') || '3'), 1), 10);
+		const seconds = Math.min(Math.max(parseInt(params.get('seconds') || '1'), 1), 2);
 		const start = performance.now();
 		const end = start + seconds * 1000;
 		let iterations = 0;
@@ -119,7 +129,7 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	}
 
 	if (action === 'memory') {
-		const mb = Math.min(Math.max(parseInt(url.searchParams.get('mb') || '50'), 1), 256);
+		const mb = Math.min(Math.max(parseInt(params.get('mb') || '8'), 1), 16);
 		const start = performance.now();
 		// Allocate buffer and fill to prevent optimization
 		const buffers: Buffer[] = [];
@@ -143,7 +153,7 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	}
 
 	if (action === 'load') {
-		const count = Math.min(parseInt(url.searchParams.get('count') || '10'), 100);
+		const count = Math.min(Math.max(parseInt(params.get('count') || '5'), 1), 20);
 		const start = performance.now();
 		const promises = Array.from({ length: count }, async (_, i) => {
 			let sum = 0;
@@ -166,7 +176,7 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 	// ═══════════════════════════════════════════════
 
 	if (action === 'flaky') {
-		const rate = Math.min(Math.max(parseInt(url.searchParams.get('rate') || '50'), 1), 99);
+		const rate = Math.min(Math.max(parseInt(params.get('rate') || '50'), 1), 99);
 		const failed = Math.random() * 100 < rate;
 		if (failed) {
 			errorsTotal.inc({ type: 'chaos_flaky' });
@@ -195,9 +205,9 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 		const results: { service: string; status: string; latency_ms: number }[] = [];
 
 		const services = [
-			{ name: 'Valkey', path: '/cache/get?key=chaos-test' },
-			{ name: 'RabbitMQ', path: '/rabbitmq/status' },
-			{ name: 'Prometheus', path: '/prometheus/demo' }
+			{ name: 'Valkey', path: '/status/valkey' },
+			{ name: 'RabbitMQ', path: '/status/rabbitmq' },
+			{ name: 'Prometheus', path: '/status/prometheus' }
 		];
 
 		for (const svc of services) {
@@ -235,9 +245,9 @@ export const GET: RequestHandler = async ({ url, fetch: svelteKitFetch }) => {
 
 	if (action === 'degrade') {
 		degradeCounter++;
-		const maxRequests = Math.min(Math.max(parseInt(url.searchParams.get('requests') || '10'), 2), 50);
+		const maxRequests = Math.min(Math.max(parseInt(params.get('requests') || '10'), 2), 20);
 		// Delay grows linearly: 0ms at request 1, up to 5000ms at maxRequests
-		const delay = Math.round(Math.min(degradeCounter / maxRequests, 1) * 5000);
+		const delay = Math.round(Math.min(degradeCounter / maxRequests, 1) * CHAOS_MAX_DELAY_MS);
 		await new Promise((resolve) => setTimeout(resolve, delay));
 		return json({
 			message: `Degradation: request #${degradeCounter}, delay ${delay}ms (saturates at ${maxRequests} requests)`,

@@ -1,52 +1,98 @@
 <script lang="ts">
-	let { ok, checked }: { ok: boolean; checked: boolean } = $props();
+	import { WORDS, type CheckState } from '#lib/check.js';
+
+	// Each state has its own shape as well as its own colour, so the state never
+	// depends on colour alone (WCAG 2.2 SC 1.4.1). The word is shown by the
+	// caller or, with `showWord`, by this component.
+	let { state, showWord = false }: { state: CheckState; showWord?: boolean } = $props();
 </script>
 
 <span
-	class="status-icon"
-	class:ok
-	class:checked
+	class="status-icon {state}"
+	title={WORDS[state]}
 >
-	{#if checked}
-		{#if ok}
-			<svg
-				viewBox="0 0 16 16"
-				fill="currentColor"
-				><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" /></svg
-			>
+	<svg
+		viewBox="0 0 16 16"
+		aria-hidden="true"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.8"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		{#if state === 'ok'}
+			<path d="M3 8.5l3.2 3.2L13 4.8" />
+		{:else if state === 'failed'}
+			<path d="M4 4l8 8M12 4l-8 8" />
+		{:else if state === 'slow'}
+			<circle
+				cx="8"
+				cy="8"
+				r="5.5"
+			/>
+			<path d="M8 4.8V8l2.2 1.4" />
+		{:else if state === 'checking'}
+			<path
+				class="spinner"
+				d="M8 2.5a5.5 5.5 0 1 1-5.5 5.5"
+			/>
 		{:else}
-			<svg
-				viewBox="0 0 16 16"
-				fill="currentColor"
-				><path
-					d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"
-				/></svg
-			>
+			<circle
+				cx="8"
+				cy="8"
+				r="5.5"
+				stroke-dasharray="2 2.6"
+			/>
 		{/if}
-	{/if}
+	</svg>
+	{#if showWord}<span class="word">{WORDS[state]}</span>{/if}
 </span>
 
 <style>
 	.status-icon {
-		width: 14px;
-		height: 14px;
-		flex-shrink: 0;
-		color: var(--muted-fg);
 		display: inline-flex;
 		align-items: center;
-		justify-content: center;
+		gap: 0.25rem;
+		flex-shrink: 0;
+		color: var(--muted-fg);
 	}
 
-	.status-icon svg {
+	svg {
 		width: 14px;
 		height: 14px;
 	}
 
-	.status-icon.checked.ok {
+	.word {
+		font-size: 0.7rem;
+		font-weight: 600;
+	}
+
+	.ok {
 		color: var(--success);
 	}
 
-	.status-icon.checked:not(.ok) {
+	.slow {
+		color: var(--warning);
+	}
+
+	.failed {
 		color: var(--danger);
+	}
+
+	.spinner {
+		transform-origin: 8px 8px;
+		animation: spin 0.9s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.spinner {
+			animation: none;
+		}
 	}
 </style>

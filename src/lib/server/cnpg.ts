@@ -2,6 +2,7 @@ import pg from 'pg';
 import { config } from './config.js';
 import { log } from './logger.js';
 import { cnpgConnected, cnpgOperations, cnpgErrors } from './metrics.js';
+import { UPSTREAM_TIMEOUT_MS } from '../limits.js';
 
 const { Pool } = pg;
 
@@ -71,7 +72,10 @@ export async function initCnpg(): Promise<void> {
 		// keep client-side reasonable).
 		max: 5,
 		idleTimeoutMillis: 30_000,
-		connectionTimeoutMillis: 5_000
+		connectionTimeoutMillis: 5_000,
+		// A query that outlives this ends with an error instead of holding the
+		// request open past the server's idle timeout.
+		query_timeout: UPSTREAM_TIMEOUT_MS
 	});
 
 	pool.on('error', (err) => {
@@ -148,13 +152,17 @@ export async function deleteItem(id: number): Promise<boolean> {
 	return (r.rowCount ?? 0) > 0;
 }
 
-export function getCnpgStatus() {
-	return {
-		// "connected" reflects schema-ready, not just pool-allocated.
-		// During the cold-start race the pool exists but the schema
-		// isn't proven yet, and CRUD ops would 500. Returning false
-		// here lets the UI show "Disconnected" until the retry loop
-		// or an op-driven ensure succeeds.
-		connected: schemaReady
-	};
+// A status that proves the database answers now: a query against the demo
+// table, which also proves the schema is in place. It never reads module
+// state, so a database that went away after startup reports as down.
+export async function getCnpgStatus(): Promise<{ items: number }> {
+	if (!pool) throw new Error('CNPG not configured');
+	await ensureSchemaIfNeeded();
+	const r = await pool.query<{ items: number }>('SELECT count(*)::int AS items FROM demo_items');
+	cnpgConnected.set(1);
+	return { items: r.rows[0]?.items ?? 0 };
+}
+
+export async function closeCnpg(): Promise<void> {
+	await pool?.end().catch(() => {});
 }

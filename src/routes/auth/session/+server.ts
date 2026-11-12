@@ -1,45 +1,16 @@
 import type { RequestHandler } from './$types';
 import { config } from '#lib/server/config.js';
+import { json, isTimeout } from '#lib/server/http.js';
+import { getSession } from '#lib/server/session.js';
 
+// What the server sees behind the browser's cookies: who, whether the address
+// is verified and when the session ends. Anonymous is a normal answer (200).
 export const GET: RequestHandler = async ({ request }) => {
-	const timestamp = new Date().toISOString();
-
-	if (!config.betterauth.enabled) {
-		return Response.json({
-			success: false,
-			action: 'session',
-			message: 'BetterAuth not configured',
-			timestamp
-		});
-	}
-
+	if (!config.betterauth.enabled) return json({ success: false, configured: false, message: 'BetterAuth not configured' }, 503);
 	try {
-		// Forward all cookies to BetterAuth for session validation
-		const cookieHeader = request.headers.get('cookie') || '';
-		const resp = await fetch(`${config.betterauth.url}/api/auth/get-session`, {
-			headers: { cookie: cookieHeader },
-			signal: AbortSignal.timeout(5000)
-		});
-
-		const data = await resp.json().catch(() => null);
-		const hasSession = resp.ok && data !== null;
-
-		return Response.json({
-			success: hasSession,
-			action: 'session',
-			message: hasSession ? 'Active session found' : 'No active session',
-			data,
-			timestamp
-		});
+		const session = await getSession(request);
+		return json({ success: true, signed_in: session !== null, session });
 	} catch (err) {
-		return Response.json(
-			{
-				success: false,
-				action: 'session',
-				message: `BetterAuth request failed: ${String(err)}`,
-				timestamp
-			},
-			{ status: 502 }
-		);
+		return json({ success: false, timeout: isTimeout(err), message: 'BetterAuth session lookup failed' }, 502);
 	}
 };

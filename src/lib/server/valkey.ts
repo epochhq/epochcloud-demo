@@ -1,6 +1,7 @@
 import Redis from 'ioredis';
 import { config } from './config.js';
 import { log } from './logger.js';
+import { UPSTREAM_TIMEOUT_MS } from '../limits.js';
 import { valkeyConnected, valkeyCacheHits, valkeyCacheMisses, valkeyOperations } from './metrics.js';
 
 let client: Redis | null = null;
@@ -23,7 +24,11 @@ export async function initValkey(): Promise<void> {
 				// retries would leave the app broken until the next pod restart.
 				return Math.min(times * 1000, 30000);
 			},
-			lazyConnect: true
+			lazyConnect: true,
+			// A command that gets no answer fails instead of waiting for ever.
+			commandTimeout: UPSTREAM_TIMEOUT_MS,
+			connectTimeout: UPSTREAM_TIMEOUT_MS,
+			maxRetriesPerRequest: 1
 		});
 
 		client.on('connect', () => {
@@ -73,8 +78,31 @@ export async function valkeySet(key: string, value: string, ttlSeconds?: number)
 	}
 }
 
-export function getValkeyStatus() {
-	return {
-		connected: client?.status === 'ready'
-	};
+// A round trip to the server: PING answers PONG only while the connection works.
+// The client's cached "ready" state would stay true for a connection that has
+// silently gone away.
+export async function pingValkey(): Promise<{ reply: string }> {
+	if (!client) throw new Error('Valkey not configured');
+	const reply = await client.ping();
+	if (reply !== 'PONG') throw new Error(`unexpected PING reply: ${String(reply)}`);
+	valkeyConnected.set(1);
+	return { reply };
+}
+
+/**
+ * Take a cooldown slot: true for the first caller within the window, false for
+ * everyone after, across all pods (SET NX EX is atomic in Valkey). It fails
+ * closed: with no Valkey there is no slot, so no mail or message goes out.
+ */
+export async function claimCooldown(key: string, seconds: number): Promise<boolean> {
+	if (!client) return false;
+	try {
+		return (await client.set(`demo:cooldown:${key}`, '1', 'EX', seconds, 'NX')) === 'OK';
+	} catch {
+		return false;
+	}
+}
+
+export async function closeValkey(): Promise<void> {
+	await client?.quit().catch(() => {});
 }

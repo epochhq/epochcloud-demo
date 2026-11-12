@@ -7,4 +7,3 @@ build
 **/.env.*
 *.log
 STATUS.md
-tests

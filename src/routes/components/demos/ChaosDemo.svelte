@@ -1,4 +1,7 @@
 <script lang="ts">
+	import SignInGate from '#lib/components/SignInGate.svelte';
+	import { CHAOS_MAX_DELAY_MS, CLIENT_TIMEOUT_MS } from '#lib/limits.js';
+
 	interface ChaosEntry {
 		action: string;
 		ok: boolean;
@@ -12,12 +15,12 @@
 	let chaosHistory: ChaosEntry[] = $state([]);
 	let chaosLoading = $state(false);
 	let chaosDegradeState: { current: number; max: number; active: boolean } | null = $state(null);
-	let chaosLoadCount = $state('10');
+	let chaosLoadCount = $state('5');
 	let chaosDelayMs = $state('2000');
 	let chaosJitterMin = $state('100');
 	let chaosJitterMax = $state('5000');
-	let chaosCpuSec = $state('3');
-	let chaosMemMb = $state('50');
+	let chaosCpuSec = $state('1');
+	let chaosMemMb = $state('8');
 	let chaosFlakyRate = $state('50');
 	let chaosDegradeMax = $state('10');
 
@@ -51,9 +54,8 @@
 	async function chaosAction(action: string, params: Record<string, string> = {}) {
 		chaosLoading = true;
 		const start = performance.now();
-		const qs = new URLSearchParams({ action, ...params }).toString();
 		try {
-			const resp = await fetch(`/chaos?${qs}`);
+			const resp = await fetch('/chaos', { method: 'POST', body: new URLSearchParams({ action, ...params }), signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS) });
 			// Read as text first so we can fall back gracefully when Cloudflare's
 			// edge intercepts an upstream 502/504 and serves its own HTML error
 			// page instead of passing through the demo app's JSON. Without this,
@@ -127,285 +129,290 @@
 	}
 </script>
 
-<div class="chaos-panel">
-	<div class="chaos-header">
-		<div>
-			<h3>Chaos Testing</h3>
-			<p class="card-desc">Inject failures, latency, and resource pressure to test observability and resilience</p>
-		</div>
-		{#if chaosLoading}<span class="chaos-loading">Running...</span>{/if}
-	</div>
-
-	<div class="chaos-grid">
-		<!-- Error Injection -->
-		<div class="chaos-section chaos-danger">
-			<h4 class="chaos-section-title">Error Injection</h4>
-			<p class="chaos-section-desc">Trigger HTTP errors to test alerting and Prometheus counters</p>
-			<div class="chaos-actions">
-				<button
-					onclick={() => chaosAction('error')}
-					class="btn btn-danger btn-sm"
-					disabled={chaosLoading}>500 Error</button
-				>
-				<button
-					onclick={() => chaosAction('error502')}
-					class="btn btn-danger btn-sm"
-					disabled={chaosLoading}>502 Gateway</button
-				>
-				<button
-					onclick={() => chaosAction('error503')}
-					class="btn btn-danger btn-sm"
-					disabled={chaosLoading}>503 Unavailable</button
-				>
+<SignInGate>
+	<div class="chaos-panel">
+		<div class="chaos-header">
+			<div>
+				<h3>Chaos Testing</h3>
+				<p class="card-desc">
+					In-app fault injection: every action runs inside this app, not through the platform's LitmusChaos. Use it to see failures and latency in Prometheus,
+					Linkerd and the alerts. Delays stop at {CHAOS_MAX_DELAY_MS / 1000}s, below the server's idle timeout.
+				</p>
 			</div>
+			{#if chaosLoading}<span class="chaos-loading">Running...</span>{/if}
 		</div>
 
-		<!-- Latency Injection -->
-		<div class="chaos-section chaos-warning">
-			<h4 class="chaos-section-title">Latency Injection</h4>
-			<p class="chaos-section-desc">Inject delays to observe p99 latency in Linkerd and Prometheus</p>
-			<div class="chaos-fields">
-				<div class="chaos-field">
-					<span class="chaos-field-label">Fixed delay</span>
-					<div class="chaos-field-row">
-						<input
-							type="number"
-							bind:value={chaosDelayMs}
-							class="input input-sm chaos-input"
-							min="100"
-							max="30000"
-						/>
-						<span class="chaos-unit">ms</span>
-						<button
-							onclick={() => chaosAction('slow', { delay: chaosDelayMs })}
-							class="btn btn-warning btn-sm"
-							disabled={chaosLoading}>Inject</button
-						>
-					</div>
-				</div>
-				<div class="chaos-field">
-					<span class="chaos-field-label">Random jitter</span>
-					<div class="chaos-field-row">
-						<input
-							type="number"
-							bind:value={chaosJitterMin}
-							class="input input-sm chaos-input"
-							min="0"
-						/>
-						<span class="chaos-unit">&ndash;</span>
-						<input
-							type="number"
-							bind:value={chaosJitterMax}
-							class="input input-sm chaos-input"
-							min="100"
-						/>
-						<span class="chaos-unit">ms</span>
-						<button
-							onclick={() => chaosAction('jitter', { min: chaosJitterMin, max: chaosJitterMax })}
-							class="btn btn-warning btn-sm"
-							disabled={chaosLoading}>Jitter</button
-						>
-					</div>
-				</div>
-				<div class="chaos-field">
-					<span class="chaos-field-label">Timeout</span>
+		<div class="chaos-grid">
+			<!-- Error Injection -->
+			<div class="chaos-section chaos-danger">
+				<h4 class="chaos-section-title">Error Injection</h4>
+				<p class="chaos-section-desc">Trigger HTTP errors to test alerting and Prometheus counters</p>
+				<div class="chaos-actions">
 					<button
-						onclick={() => chaosAction('timeout')}
-						class="btn btn-warning btn-sm"
-						disabled={chaosLoading}>30s Timeout</button
+						onclick={() => chaosAction('error')}
+						class="btn btn-danger btn-sm"
+						disabled={chaosLoading}>500 Error</button
 					>
-				</div>
-			</div>
-		</div>
-
-		<!-- Resource Pressure -->
-		<div class="chaos-section chaos-accent">
-			<h4 class="chaos-section-title">Resource Pressure</h4>
-			<p class="chaos-section-desc">Stress CPU/memory to observe metrics, OOM behavior, and scaling</p>
-			<div class="chaos-fields">
-				<div class="chaos-field">
-					<span class="chaos-field-label">CPU burn</span>
-					<div class="chaos-field-row">
-						<input
-							type="number"
-							bind:value={chaosCpuSec}
-							class="input input-sm chaos-input"
-							min="1"
-							max="10"
-						/>
-						<span class="chaos-unit">sec</span>
-						<button
-							onclick={() => chaosAction('cpu', { seconds: chaosCpuSec })}
-							class="btn btn-accent btn-sm"
-							disabled={chaosLoading}>Burn</button
-						>
-					</div>
-				</div>
-				<div class="chaos-field">
-					<span class="chaos-field-label">Memory spike</span>
-					<div class="chaos-field-row">
-						<input
-							type="number"
-							bind:value={chaosMemMb}
-							class="input input-sm chaos-input"
-							min="1"
-							max="256"
-						/>
-						<span class="chaos-unit">MB</span>
-						<button
-							onclick={() => chaosAction('memory', { mb: chaosMemMb })}
-							class="btn btn-accent btn-sm"
-							disabled={chaosLoading}>Spike</button
-						>
-					</div>
-				</div>
-				<div class="chaos-field">
-					<span class="chaos-field-label">Concurrent load</span>
-					<div class="chaos-field-row">
-						<input
-							type="number"
-							bind:value={chaosLoadCount}
-							class="input input-sm chaos-input"
-							min="1"
-							max="100"
-						/>
-						<span class="chaos-unit">ops</span>
-						<button
-							onclick={() => chaosAction('load', { count: chaosLoadCount })}
-							class="btn btn-accent btn-sm"
-							disabled={chaosLoading}>Run</button
-						>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<!-- Failure Patterns -->
-		<div class="chaos-section chaos-muted">
-			<h4 class="chaos-section-title">Failure Patterns</h4>
-			<p class="chaos-section-desc">Intermittent errors, cascading failures, and gradual degradation</p>
-			<div class="chaos-fields">
-				<div class="chaos-field">
-					<span class="chaos-field-label">Flaky endpoint</span>
-					<div class="chaos-field-row">
-						<input
-							type="number"
-							bind:value={chaosFlakyRate}
-							class="input input-sm chaos-input"
-							min="1"
-							max="99"
-						/>
-						<span class="chaos-unit">%</span>
-						<button
-							onclick={() => chaosAction('flaky', { rate: chaosFlakyRate })}
-							class="btn btn-outline btn-sm"
-							disabled={chaosLoading}>Test</button
-						>
-					</div>
-				</div>
-				<div class="chaos-field">
-					<span class="chaos-field-label">Degradation</span>
-					<div class="chaos-field-row">
-						<input
-							type="number"
-							bind:value={chaosDegradeMax}
-							class="input input-sm chaos-input"
-							min="2"
-							max="50"
-						/>
-						<span class="chaos-unit">reqs</span>
-						<button
-							onclick={() => chaosAction('degrade', { requests: chaosDegradeMax })}
-							class="btn btn-outline btn-sm"
-							disabled={chaosLoading}>Start</button
-						>
-						<button
-							onclick={() => chaosAction('degrade-reset')}
-							class="btn btn-outline btn-sm"
-							disabled={chaosLoading}>Reset</button
-						>
-					</div>
-					{#if chaosDegradeState}
-						<div class="degrade-progress">
-							<div
-								class="degrade-bar"
-								style="width: {Math.min((chaosDegradeState.current / chaosDegradeState.max) * 100, 100)}%"
-							></div>
-						</div>
-						<span class="chaos-unit"
-							>{chaosDegradeState.current}/{chaosDegradeState.max} requests{chaosDegradeState.current >= chaosDegradeState.max ? ' (saturated)' : ''}</span
-						>
-					{/if}
-				</div>
-				<div class="chaos-field">
-					<span class="chaos-field-label">Cascade check</span>
 					<button
-						onclick={() => chaosAction('cascade')}
-						class="btn btn-outline btn-sm"
-						disabled={chaosLoading}>Valkey + RabbitMQ + Prometheus</button
+						onclick={() => chaosAction('error502')}
+						class="btn btn-danger btn-sm"
+						disabled={chaosLoading}>502 Gateway</button
+					>
+					<button
+						onclick={() => chaosAction('error503')}
+						class="btn btn-danger btn-sm"
+						disabled={chaosLoading}>503 Unavailable</button
 					>
 				</div>
 			</div>
-		</div>
-	</div>
 
-	<!-- Action History -->
-	{#if chaosHistory.length > 0}
-		<div class="chaos-log">
-			<div class="chaos-log-header">
-				<h4 class="chaos-section-title">Action Log</h4>
-				<button
-					class="btn btn-outline btn-sm"
-					onclick={() => {
-						chaosHistory = [];
-						chaosDegradeState = null;
-					}}>Clear</button
-				>
-			</div>
-			<div class="chaos-log-entries">
-				{#each chaosHistory as entry (entry.timestamp)}
-					<div
-						class="chaos-log-entry"
-						class:ok={entry.ok}
-						class:err={!entry.ok}
-					>
-						<div class="chaos-log-main">
-							<span
-								class="chaos-log-badge"
-								class:ok={entry.ok}
-								class:err={!entry.ok}>{entry.ok ? '✓' : '✗'}</span
+			<!-- Latency Injection -->
+			<div class="chaos-section chaos-warning">
+				<h4 class="chaos-section-title">Latency Injection</h4>
+				<p class="chaos-section-desc">Inject delays to observe p99 latency in Linkerd and Prometheus</p>
+				<div class="chaos-fields">
+					<div class="chaos-field">
+						<span class="chaos-field-label">Fixed delay</span>
+						<div class="chaos-field-row">
+							<input
+								type="number"
+								bind:value={chaosDelayMs}
+								class="input input-sm chaos-input"
+								min="100"
+								max={CHAOS_MAX_DELAY_MS}
+							/>
+							<span class="chaos-unit">ms</span>
+							<button
+								onclick={() => chaosAction('slow', { delay: chaosDelayMs })}
+								class="btn btn-warning btn-sm"
+								disabled={chaosLoading}>Inject</button
 							>
-							<span class="chaos-log-action">{entry.action}</span>
-							<span class="chaos-log-msg">{entry.message}</span>
 						</div>
-						<span class="chaos-log-time">{entry.elapsedMs}ms</span>
 					</div>
-					{#if entry.services}
-						<table class="cascade-table">
-							<thead><tr><th>Service</th><th>Status</th><th>Latency</th></tr></thead>
-							<tbody>
-								{#each entry.services as svc (svc.service)}
-									<tr>
-										<td>{svc.service}</td>
-										<td
-											><span
-												class="cascade-dot"
-												class:ok={svc.status === 'ok'}
-												class:err={svc.status !== 'ok'}
-											></span>
-											{svc.status}</td
-										>
-										<td>{svc.latency_ms}ms</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					{/if}
-				{/each}
+					<div class="chaos-field">
+						<span class="chaos-field-label">Random jitter</span>
+						<div class="chaos-field-row">
+							<input
+								type="number"
+								bind:value={chaosJitterMin}
+								class="input input-sm chaos-input"
+								min="0"
+							/>
+							<span class="chaos-unit">&ndash;</span>
+							<input
+								type="number"
+								bind:value={chaosJitterMax}
+								class="input input-sm chaos-input"
+								min="100"
+							/>
+							<span class="chaos-unit">ms</span>
+							<button
+								onclick={() => chaosAction('jitter', { min: chaosJitterMin, max: chaosJitterMax })}
+								class="btn btn-warning btn-sm"
+								disabled={chaosLoading}>Jitter</button
+							>
+						</div>
+					</div>
+					<div class="chaos-field">
+						<span class="chaos-field-label">Timeout</span>
+						<button
+							onclick={() => chaosAction('timeout')}
+							class="btn btn-warning btn-sm"
+							disabled={chaosLoading}>{CHAOS_MAX_DELAY_MS / 1000}s Timeout</button
+						>
+					</div>
+				</div>
+			</div>
+
+			<!-- Resource Pressure -->
+			<div class="chaos-section chaos-accent">
+				<h4 class="chaos-section-title">Resource Pressure</h4>
+				<p class="chaos-section-desc">Stress CPU/memory to observe metrics, OOM behavior, and scaling</p>
+				<div class="chaos-fields">
+					<div class="chaos-field">
+						<span class="chaos-field-label">CPU burn</span>
+						<div class="chaos-field-row">
+							<input
+								type="number"
+								bind:value={chaosCpuSec}
+								class="input input-sm chaos-input"
+								min="1"
+								max="2"
+							/>
+							<span class="chaos-unit">sec</span>
+							<button
+								onclick={() => chaosAction('cpu', { seconds: chaosCpuSec })}
+								class="btn btn-accent btn-sm"
+								disabled={chaosLoading}>Burn</button
+							>
+						</div>
+					</div>
+					<div class="chaos-field">
+						<span class="chaos-field-label">Memory spike</span>
+						<div class="chaos-field-row">
+							<input
+								type="number"
+								bind:value={chaosMemMb}
+								class="input input-sm chaos-input"
+								min="1"
+								max="16"
+							/>
+							<span class="chaos-unit">MB</span>
+							<button
+								onclick={() => chaosAction('memory', { mb: chaosMemMb })}
+								class="btn btn-accent btn-sm"
+								disabled={chaosLoading}>Spike</button
+							>
+						</div>
+					</div>
+					<div class="chaos-field">
+						<span class="chaos-field-label">Concurrent load</span>
+						<div class="chaos-field-row">
+							<input
+								type="number"
+								bind:value={chaosLoadCount}
+								class="input input-sm chaos-input"
+								min="1"
+								max="20"
+							/>
+							<span class="chaos-unit">ops</span>
+							<button
+								onclick={() => chaosAction('load', { count: chaosLoadCount })}
+								class="btn btn-accent btn-sm"
+								disabled={chaosLoading}>Run</button
+							>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Failure Patterns -->
+			<div class="chaos-section chaos-muted">
+				<h4 class="chaos-section-title">Failure Patterns</h4>
+				<p class="chaos-section-desc">Intermittent errors, cascading failures, and gradual degradation</p>
+				<div class="chaos-fields">
+					<div class="chaos-field">
+						<span class="chaos-field-label">Flaky endpoint</span>
+						<div class="chaos-field-row">
+							<input
+								type="number"
+								bind:value={chaosFlakyRate}
+								class="input input-sm chaos-input"
+								min="1"
+								max="99"
+							/>
+							<span class="chaos-unit">%</span>
+							<button
+								onclick={() => chaosAction('flaky', { rate: chaosFlakyRate })}
+								class="btn btn-outline btn-sm"
+								disabled={chaosLoading}>Test</button
+							>
+						</div>
+					</div>
+					<div class="chaos-field">
+						<span class="chaos-field-label">Degradation</span>
+						<div class="chaos-field-row">
+							<input
+								type="number"
+								bind:value={chaosDegradeMax}
+								class="input input-sm chaos-input"
+								min="2"
+								max="50"
+							/>
+							<span class="chaos-unit">reqs</span>
+							<button
+								onclick={() => chaosAction('degrade', { requests: chaosDegradeMax })}
+								class="btn btn-outline btn-sm"
+								disabled={chaosLoading}>Start</button
+							>
+							<button
+								onclick={() => chaosAction('degrade-reset')}
+								class="btn btn-outline btn-sm"
+								disabled={chaosLoading}>Reset</button
+							>
+						</div>
+						{#if chaosDegradeState}
+							<div class="degrade-progress">
+								<div
+									class="degrade-bar"
+									style="width: {Math.min((chaosDegradeState.current / chaosDegradeState.max) * 100, 100)}%"
+								></div>
+							</div>
+							<span class="chaos-unit"
+								>{chaosDegradeState.current}/{chaosDegradeState.max} requests{chaosDegradeState.current >= chaosDegradeState.max ? ' (saturated)' : ''}</span
+							>
+						{/if}
+					</div>
+					<div class="chaos-field">
+						<span class="chaos-field-label">Cascade check</span>
+						<button
+							onclick={() => chaosAction('cascade')}
+							class="btn btn-outline btn-sm"
+							disabled={chaosLoading}>Valkey + RabbitMQ + Prometheus</button
+						>
+					</div>
+				</div>
 			</div>
 		</div>
-	{/if}
-</div>
+
+		<!-- Action History -->
+		{#if chaosHistory.length > 0}
+			<div class="chaos-log">
+				<div class="chaos-log-header">
+					<h4 class="chaos-section-title">Action Log</h4>
+					<button
+						class="btn btn-outline btn-sm"
+						onclick={() => {
+							chaosHistory = [];
+							chaosDegradeState = null;
+						}}>Clear</button
+					>
+				</div>
+				<div class="chaos-log-entries">
+					{#each chaosHistory as entry (entry.timestamp)}
+						<div
+							class="chaos-log-entry"
+							class:ok={entry.ok}
+							class:err={!entry.ok}
+						>
+							<div class="chaos-log-main">
+								<span
+									class="chaos-log-badge"
+									class:ok={entry.ok}
+									class:err={!entry.ok}>{entry.ok ? '✓' : '✗'}</span
+								>
+								<span class="chaos-log-action">{entry.action}</span>
+								<span class="chaos-log-msg">{entry.message}</span>
+							</div>
+							<span class="chaos-log-time">{entry.elapsedMs}ms</span>
+						</div>
+						{#if entry.services}
+							<table class="cascade-table">
+								<thead><tr><th>Service</th><th>Status</th><th>Latency</th></tr></thead>
+								<tbody>
+									{#each entry.services as svc (svc.service)}
+										<tr>
+											<td>{svc.service}</td>
+											<td
+												><span
+													class="cascade-dot"
+													class:ok={svc.status === 'ok'}
+													class:err={svc.status !== 'ok'}
+												></span>
+												{svc.status}</td
+											>
+											<td>{svc.latency_ms}ms</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						{/if}
+					{/each}
+				</div>
+			</div>
+		{/if}
+	</div>
+</SignInGate>
 
 <style>
 	.chaos-panel {

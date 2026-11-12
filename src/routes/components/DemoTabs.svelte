@@ -1,43 +1,32 @@
 <script lang="ts">
-	let {
-		activeDemo,
-		statuses,
-		onSelect
-	}: {
-		activeDemo: string;
-		statuses: Record<string, { ok: boolean; checked: boolean }>;
-		onSelect: (id: string) => void;
-	} = $props();
+	import StatusIcon from '#lib/components/StatusIcon.svelte';
+	import { DEMOS } from '#lib/demos.js';
+	import { getPage } from '#lib/status.svelte.js';
 
-	const tabs = [
-		{ id: 'rabbitmq', label: 'RabbitMQ', statusKey: 'rabbitmq' },
-		{ id: 'valkey', label: 'Valkey', statusKey: 'valkey' },
-		{ id: 'cnpg', label: 'CNPG', statusKey: 'cnpg' },
-		{ id: 'email', label: 'Email', statusKey: null },
-		{ id: 'betterauth', label: 'BetterAuth', statusKey: 'betterauth' },
-		{ id: 'crowdsec', label: 'CrowdSec', statusKey: 'crowdsec' },
-		{ id: 'defectdojo', label: 'DefectDojo', statusKey: 'defectdojo' },
-		{ id: 'prometheus', label: 'Prometheus', statusKey: null },
-		{ id: 'linkerd', label: 'Linkerd', statusKey: null },
-		{ id: 'chaos', label: 'Chaos Testing', statusKey: null },
-		{ id: 'featureflags', label: 'Feature Flags', statusKey: 'featureflags' },
-		{ id: 'ntfy', label: 'ntfy', statusKey: 'ntfy' },
-		{ id: 'knative', label: 'Knative', statusKey: null }
-	];
+	let { activeDemo, onSelect }: { activeDemo: string; onSelect: (id: string) => void } = $props();
+
+	const { board } = getPage();
 </script>
 
 <div class="demo-tabs">
-	{#each tabs as tab (tab.id)}
+	{#each DEMOS as tab (tab.id)}
+		{@const entry = board.get(tab.id)}
 		<button
 			class="demo-tab"
 			class:active={activeDemo === tab.id}
 			onclick={() => onSelect(tab.id)}
+			title={tab.noCheck ?? entry.detail}
 		>
-			{#if tab.statusKey && statuses[tab.statusKey]?.checked}
+			{#if tab.statusUrl}
+				<StatusIcon
+					state={entry.state}
+					showWord
+				/>
+			{:else}
 				<span
-					class="tab-dot"
-					class:ok={statuses[tab.statusKey]?.ok}
-				></span>
+					class="no-check"
+					title={tab.noCheck}>In-app</span
+				>
 			{/if}
 			{tab.label}
 		</button>
@@ -81,15 +70,9 @@
 		border-color: var(--border-hover);
 	}
 
-	.tab-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--danger);
-		flex-shrink: 0;
-	}
-
-	.tab-dot.ok {
-		background: var(--success);
+	.no-check {
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: var(--muted-fg);
 	}
 </style>
