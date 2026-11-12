@@ -57,7 +57,7 @@ export async function getDefectDojoSummary(): Promise<DefectDojoSummary> {
 
 export async function initDefectDojo(): Promise<void> {
 	if (!config.defectdojo.enabled) {
-		log('info', 'DefectDojo disabled (DEFECTDOJO_URL not set)');
+		log('info', 'DefectDojo not running', { reason: config.defectdojo.url ? 'no DefectDojo token for the app' : 'DEFECTDOJO_URL not set' });
 		return;
 	}
 	try {

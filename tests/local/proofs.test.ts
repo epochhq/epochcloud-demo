@@ -11,7 +11,7 @@ import { namespaceFrom } from '../../src/lib/server/namespace.js';
 // kubelet's health probes out.
 
 it('limits every proof query to the namespace', () => {
-	for (const proof of PROOFS) expect(proof.query, proof.id).toContain('{NS');
+	for (const proof of PROOFS) expect(proof.query, proof.id).toMatch(/\{NS|NSNAME/);
 });
 
 it('leaves kubelet health probes out of the request, error-share and latency proofs', () => {
@@ -34,13 +34,28 @@ it('judges a value against the healthy range, and no data is not healthy', () =>
 	const proof = PROOFS.find((p) => p.id === 'error-share')!;
 	expect(judge(proof, 0.01)).toBe('ok');
 	expect(judge(proof, 0.2)).toBe('failed');
-	expect(judge(proof, null)).toBe('failed');
+	expect(judge(proof, null)).toBe('nodata');
+	expect(judge(proof, Number.NaN)).toBe('nodata');
 	expect(
 		judge(
 			PROOFS.find((p) => p.id === 'demo-counter')!,
 			3
 		)
 	).toBe('info');
+});
+
+it('tells a query that answered with no data from one that failed', async () => {
+	vi.stubGlobal('fetch', async (url: string) => {
+		const q = decodeURIComponent(new globalThis.URL(url).searchParams.get('query') ?? '');
+		if (q.includes('kube_pod_container_status_restarts_total')) throw new Error('refused');
+		return Response.json({ status: 'success', data: { result: [] } });
+	});
+	const proofs = await evaluateProofs('epochcloud-demo-dev');
+	const restarts = proofs.find((proof) => proof.id === 'restarts')!;
+	expect(restarts).toMatchObject({ answered: false, state: 'failed' });
+	const requests = proofs.find((proof) => proof.id === 'requests')!;
+	expect(requests).toMatchObject({ answered: true, value: null, state: 'nodata' });
+	expect(proofs.filter((proof) => proof.answered).length).toBe(PROOFS.length - 1);
 });
 
 it('takes the namespace from the environment, else from the pod DNS search path', () => {

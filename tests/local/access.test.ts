@@ -27,6 +27,7 @@ import { handle } from '../../src/hooks.server.js';
 import { ANONYMOUS_PREFIXES, ANONYMOUS_ROUTES } from '../../src/lib/server/access.js';
 import { HANDLER_WAITS } from '../../src/lib/limits.js';
 import { getSession } from '../../src/lib/server/session.js';
+import { httpRequestsTotal } from '../../src/lib/server/metrics.js';
 
 // Sign-in is decided once, in the `handle` hook. These tests drive the real hook
 // over every route module in the tree, so a new route is closed until it is
@@ -155,4 +156,13 @@ it('puts the response headers on what it answers, refusals included', async () =
 		expect(response.headers.get('x-content-type-options')).toBe('nosniff');
 		expect(response.headers.get('permissions-policy')).toContain('camera=()');
 	}
+});
+
+it('labels the metrics of a path the app does not route as /other, so a request cannot make a new series', async () => {
+	await run(event('/_app/immutable/chunks/never-seen-xyz.js')).done;
+	await run(event('/status/never-seen-xyz')).done;
+	const labels = (await httpRequestsTotal.get()).values.map((value) => String(value.labels.path));
+	expect(labels).toContain('/other');
+	expect(labels).toContain('/status/:name');
+	expect(labels.filter((path) => path.includes('never-seen'))).toEqual([]);
 });

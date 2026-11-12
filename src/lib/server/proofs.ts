@@ -67,6 +67,13 @@ export const PROOFS: Proof[] = [
 		by: 'pod'
 	},
 	{
+		id: 'entrypoint-requests',
+		group: 'linkerd',
+		title: 'Requests that came through the entrypoint in the last 10 minutes',
+		query: 'sum(increase(traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"}[10m]))',
+		unit: 'requests'
+	},
+	{
 		id: 'mtls-traefik',
 		group: 'linkerd',
 		title: 'Requests from Traefik over mTLS in the last 10 minutes',
@@ -91,13 +98,16 @@ export interface ProofResult {
 	unit: string;
 	healthy?: Proof['healthy'];
 	value: number | null;
+	/** Whether Prometheus answered the query at all; an answer with no data is still an answer. */
+	answered: boolean;
 	series?: Array<{ label: string; value: number }>;
-	state: 'ok' | 'failed' | 'info';
+	/** "nodata": answered, nothing to judge (no traffic yet); "failed": out of range, or the query failed. */
+	state: 'ok' | 'failed' | 'info' | 'nodata';
 }
 
 export function judge(proof: Proof, value: number | null): ProofResult['state'] {
 	if (!proof.healthy) return 'info';
-	if (value === null || Number.isNaN(value)) return 'failed';
+	if (value === null || Number.isNaN(value)) return 'nodata';
 	if (proof.healthy.min !== undefined && value < proof.healthy.min) return 'failed';
 	if (proof.healthy.max !== undefined && value > proof.healthy.max) return 'failed';
 	return 'ok';
@@ -111,7 +121,7 @@ export async function evaluateProofs(namespace: string, group?: Proof['group']):
 		PROOFS.filter((proof) => !group || proof.group === group).map(async (proof): Promise<ProofResult> => {
 			const base = { id: proof.id, group: proof.group, title: proof.title, unit: proof.unit, healthy: proof.healthy };
 			try {
-				const samples = await query(proof.query.replaceAll('NS', ns));
+				const samples = await query(proof.query.replaceAll('NSNAME', namespace).replaceAll('NS', ns));
 				if (proof.by) {
 					const series = samples.map((s) => ({
 						label:
@@ -120,12 +130,12 @@ export async function evaluateProofs(namespace: string, group?: Proof['group']):
 								: (s.labels[proof.by!] ?? '?'),
 						value: Math.round(s.value)
 					}));
-					return { ...base, value: series.reduce((sum, s) => sum + s.value, 0), series, state: judge(proof, series.length ? 1 : null) };
+					return { ...base, value: series.reduce((sum, s) => sum + s.value, 0), answered: true, series, state: judge(proof, series.length ? 1 : null) };
 				}
 				const value = samples[0] ? samples[0].value : null;
-				return { ...base, value, state: judge(proof, value) };
+				return { ...base, value, answered: true, state: judge(proof, value) };
 			} catch {
-				return { ...base, value: null, state: 'failed' };
+				return { ...base, value: null, answered: false, state: 'failed' };
 			}
 		})
 	);

@@ -28,8 +28,8 @@ export const DEMOS: DemoTab[] = [
 		label: 'Prometheus',
 		statusUrl: '/status/proofs',
 		describe: (d) => {
-			const proofs = (d.proofs as Array<{ value: number | null }> | undefined) ?? [];
-			return `${proofs.filter((proof) => proof.value !== null).length} of ${proofs.length} queries answered`;
+			const proofs = (d.proofs as Array<{ answered: boolean }> | undefined) ?? [];
+			return `${proofs.filter((proof) => proof.answered).length} of ${proofs.length} queries answered`;
 		}
 	},
 	{ id: 'linkerd', label: 'Linkerd', statusUrl: '/status/linkerd', describe: (d) => `${n(d.mtls_requests_10m)} mTLS requests from Traefik in 10 minutes` },

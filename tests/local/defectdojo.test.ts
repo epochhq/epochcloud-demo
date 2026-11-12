@@ -1,9 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vite-plus/test';
 
-vi.mock('#lib/server/config.js', () => ({ config: { defectdojo: { url: 'http://dojo.test', token: 't', product: 'epochcloud-demo', enabled: true } } }));
-vi.mock('#lib/server/logger.js', () => ({ log: vi.fn() }));
+const { config } = vi.hoisted(() => ({ config: { defectdojo: { url: 'http://dojo.test', token: 't', product: 'epochcloud-demo', enabled: true } } }));
+vi.mock('#lib/server/config.js', () => ({ config }));
+const { log } = vi.hoisted(() => ({ log: vi.fn() }));
+vi.mock('#lib/server/logger.js', () => ({ log }));
 
-import { getDefectDojoSummary } from '../../src/lib/server/defectdojo.js';
+import { getDefectDojoSummary, initDefectDojo } from '../../src/lib/server/defectdojo.js';
 
 const PER_SEVERITY: Record<string, number> = { Critical: 2, High: 31, Medium: 67, Low: 5, Info: 1 };
 
@@ -43,4 +45,20 @@ it('discloses nothing when the demo product is missing, even if other products e
 it('is not connected when any upstream call fails: no false green', async () => {
 	vi.stubGlobal('fetch', dojo({ failOn: 'severity=High' }));
 	await expect(getDefectDojoSummary()).rejects.toThrow('DefectDojo answered 502');
+});
+
+it('logs why DefectDojo is not running: the token, when the URL is set', async () => {
+	config.defectdojo.enabled = false;
+	config.defectdojo.token = '';
+	try {
+		await initDefectDojo();
+		expect(log).toHaveBeenCalledWith('info', 'DefectDojo not running', { reason: 'no DefectDojo token for the app' });
+		config.defectdojo.url = '';
+		await initDefectDojo();
+		expect(log).toHaveBeenCalledWith('info', 'DefectDojo not running', { reason: 'DEFECTDOJO_URL not set' });
+	} finally {
+		config.defectdojo.enabled = true;
+		config.defectdojo.token = 't';
+		config.defectdojo.url = 'http://dojo.test';
+	}
 });

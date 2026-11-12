@@ -9,7 +9,7 @@
 		unit: string;
 		value: number | null;
 		series?: Array<{ label: string; value: number }>;
-		state: 'ok' | 'failed' | 'info';
+		state: 'ok' | 'failed' | 'info' | 'nodata';
 	}
 
 	// Renders the proofs the server evaluated for one group. The list itself is
@@ -48,7 +48,7 @@
 			{#each proofs as proof (proof.id)}
 				<tr>
 					<td class="state"
-						>{#if proof.state === 'info'}<span class="info">Reading</span>{:else}<StatusIcon
+						>{#if proof.state === 'info'}<span class="info">Reading</span>{:else if proof.state === 'nodata'}<span class="info">No data</span>{:else}<StatusIcon
 								state={proof.state}
 								showWord
 							/>{/if}</td

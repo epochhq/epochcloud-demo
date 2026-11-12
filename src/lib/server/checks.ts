@@ -89,24 +89,28 @@ defineChecks([
 			const namespace = currentNamespace();
 			if (!namespace) throw new Error('namespace unknown');
 			const proofs = await evaluateProofs(namespace);
-			if (proofs.every((proof) => proof.value === null)) throw new Error('Prometheus answered none of the proofs');
+			if (!proofs.some((proof) => proof.answered)) throw new Error('Prometheus answered none of the proofs');
 			return { proofs };
 		}
 	},
 	{
-		// The mesh proof alone: the proxies counted requests that came in over mTLS
-		// from Traefik, which is what the entrypoint's meshed hop must show.
+		// The mesh proof: requests that came through the entrypoint reached the app
+		// over mTLS, counted by the proxies. No request at all through the
+		// entrypoint is not a failure of the mesh, there is nothing to show yet.
+		// Requests that arrived without mTLS, or a query that failed, are.
 		name: 'linkerd',
 		enabled: prometheusEnabled,
 		missing: 'Prometheus not configured',
 		run: async () => {
 			const namespace = currentNamespace();
 			if (!namespace) throw new Error('namespace unknown');
-			const [proof] = await evaluateProofs(namespace, 'linkerd');
-			// No request through the entrypoint in the window is not a failure of the
-			// mesh: there is nothing to show yet.
-			if (proof?.state !== 'ok') throw new NotRunning('No request came through the entrypoint in the last 10 minutes');
-			return { mtls_requests_10m: Math.round(proof.value ?? 0) };
+			const proofs = await evaluateProofs(namespace, 'linkerd');
+			const entry = proofs.find((proof) => proof.id === 'entrypoint-requests');
+			const mtls = proofs.find((proof) => proof.id === 'mtls-traefik');
+			if (!entry?.answered || !mtls?.answered) throw new Error('Prometheus did not answer the mesh queries');
+			if (!entry.value) throw new NotRunning('No request came through the entrypoint in the last 10 minutes');
+			if (!mtls.value || mtls.value < 1) throw new Error('requests came through the entrypoint but none reached the app over mTLS');
+			return { mtls_requests_10m: Math.round(mtls.value) };
 		}
 	},
 	{

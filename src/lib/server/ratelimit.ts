@@ -30,12 +30,3 @@ export function createLimiter(limit: Limit): Limiter {
 		}
 	};
 }
-
-/** Take from several limiters; the first refusal wins. */
-export async function takeAll(checks: Array<[Limiter, string]>): Promise<Response | null> {
-	for (const [limiter, key] of checks) {
-		const refused = await limiter.take(key);
-		if (refused) return refused;
-	}
-	return null;
-}
