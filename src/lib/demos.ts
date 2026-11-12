@@ -32,7 +32,12 @@ export const DEMOS: DemoTab[] = [
 			return `${proofs.filter((proof) => proof.answered).length} of ${proofs.length} queries answered`;
 		}
 	},
-	{ id: 'linkerd', label: 'Linkerd', statusUrl: '/status/linkerd', describe: (d) => `${n(d.mtls_requests_10m)} mTLS requests from Traefik in 10 minutes` },
+	{
+		id: 'linkerd',
+		label: 'Linkerd',
+		statusUrl: '/status/linkerd',
+		describe: (d) => `${n(d.mtls_series_10m)} request series from Traefik over mTLS in 10 minutes`
+	},
 	{ id: 'featureflags', label: 'Feature Flags', statusUrl: '/status/featureflags', describe: (d) => `${n(d.flags_available)} flags` },
 	{ id: 'ntfy', label: 'ntfy', statusUrl: '/status/ntfy', describe: () => 'Server reports healthy' },
 	{ id: 'knative', label: 'Knative', statusUrl: '/status/knative', describe: (d) => `Invocation answered in ${n(d.latency_ms)} ms` }

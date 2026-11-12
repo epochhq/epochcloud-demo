@@ -94,10 +94,13 @@ defineChecks([
 		}
 	},
 	{
-		// The mesh proof: requests that came through the entrypoint reached the app
-		// over mTLS, counted by the proxies. No request at all through the
-		// entrypoint is not a failure of the mesh, there is nothing to show yet.
-		// Requests that arrived without mTLS, or a query that failed, are.
+		// The mesh proof, judged by which series exist in the window. The proxy
+		// drops a series that stays idle and recreates it at 1 on the next
+		// request, so a counter's increase would read a request on a recreated
+		// series as none. Failed only on positive evidence: a request series that
+		// reached the app without mTLS, or a query that failed. A series from
+		// Traefik over mTLS is the pass. Nothing to show (no request came, or the
+		// proxies have no series for it yet) is Not running, not Failed.
 		name: 'linkerd',
 		enabled: prometheusEnabled,
 		missing: 'Prometheus not configured',
@@ -107,10 +110,15 @@ defineChecks([
 			const proofs = await evaluateProofs(namespace, 'linkerd');
 			const entry = proofs.find((proof) => proof.id === 'entrypoint-requests');
 			const mtls = proofs.find((proof) => proof.id === 'mtls-traefik');
-			if (!entry?.answered || !mtls?.answered) throw new Error('Prometheus did not answer the mesh queries');
-			if (!entry.value) throw new NotRunning('No request came through the entrypoint in the last 10 minutes');
-			if (!mtls.value || mtls.value < 1) throw new Error('requests came through the entrypoint but none reached the app over mTLS');
-			return { mtls_requests_10m: Math.round(mtls.value) };
+			const plaintext = proofs.find((proof) => proof.id === 'plaintext-inbound');
+			if (!entry?.answered || !mtls?.answered || !plaintext?.answered) throw new Error('Prometheus did not answer the mesh queries');
+			if (plaintext.value) throw new Error('requests reached the app without mTLS');
+			if (mtls.value) return { mtls_series_10m: Math.round(mtls.value) };
+			throw new NotRunning(
+				entry.value
+					? 'Requests came through the entrypoint, but the proxies have no series for them yet'
+					: 'No request came through the entrypoint in the last 10 minutes'
+			);
 		}
 	},
 	{

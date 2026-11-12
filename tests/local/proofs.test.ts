@@ -18,7 +18,13 @@ it('leaves kubelet health probes out of the request, error-share and latency pro
 	for (const id of ['requests', 'error-share', 'p95']) expect(PROOFS.find((proof) => proof.id === id)?.query, id).toContain('/health');
 });
 
-it('substitutes the namespace matcher, and refuses a namespace that could end the quote', async () => {
+it('leaves kubelet probes out of the plaintext proof, so only a real caller without mTLS fails it', () => {
+	const query = PROOFS.find((proof) => proof.id === 'plaintext-inbound')!.query;
+	expect(query).toContain('tls!="true"');
+	expect(query).toContain('authz_name!="probe"');
+});
+
+it('substitutes the namespace matcher and the service name exactly, and refuses a namespace that could end the quote', async () => {
 	const queries: string[] = [];
 	vi.stubGlobal('fetch', async (url: string) => {
 		queries.push(decodeURIComponent(new globalThis.URL(url).searchParams.get('query') ?? ''));
@@ -26,7 +32,18 @@ it('substitutes the namespace matcher, and refuses a namespace that could end th
 	});
 	await evaluateProofs('epochcloud-demo-dev');
 	expect(queries.length).toBe(PROOFS.length);
-	for (const query of queries) expect(query).toMatch(/namespace="epochcloud-demo-dev"|exported_service=~"epochcloud-demo-dev-epochcloud-demo/);
+	const service = 'exported_service=~"epochcloud-demo-dev-epochcloud-demo(-canary)?-80@kubernetescrd"';
+	PROOFS.forEach((proof, i) => {
+		const query = queries[i] ?? '';
+		expect(query, proof.id).not.toMatch(/NSNAME|\{NS|NS\}/);
+		if (proof.query.includes('NSNAME')) {
+			// every occurrence is the full service name with the namespace in it
+			expect(query, proof.id).toContain(service);
+			expect(query.split(service).length - 1, proof.id).toBe(proof.query.split('exported_service=').length - 1);
+		} else {
+			expect(query, proof.id).toContain('{namespace="epochcloud-demo-dev"');
+		}
+	});
 	await expect(evaluateProofs('x"} or vector(1) #')).rejects.toThrow('invalid namespace');
 });
 
@@ -42,6 +59,33 @@ it('judges a value against the healthy range, and no data is not healthy', () =>
 			3
 		)
 	).toBe('info');
+});
+
+it('reads No data, never Failed, on a row that counts traffic when nothing came', async () => {
+	const answer = (value: number | null) => async () =>
+		Response.json({ status: 'success', data: { result: value === null ? [] : [{ metric: {}, value: [0, String(value)] }] } });
+	const traffic = PROOFS.filter((proof) => proof.traffic).map((proof) => proof.id);
+	expect(traffic).toEqual(['requests', 'entrypoint-requests', 'mtls-traefik']);
+	for (const value of [0, null]) {
+		vi.stubGlobal('fetch', answer(value));
+		const proofs = await evaluateProofs('epochcloud-demo-dev');
+		for (const id of traffic)
+			expect(
+				proofs.find((proof) => proof.id === id),
+				`${id} = ${value}`
+			).toMatchObject({ answered: true, state: 'nodata' });
+	}
+	vi.stubGlobal('fetch', answer(3));
+	const proofs = await evaluateProofs('epochcloud-demo-dev');
+	for (const id of traffic) expect(proofs.find((proof) => proof.id === id)?.state, id).toBe('ok');
+});
+
+it('fails the plaintext row on a series without mTLS and passes it on none', async () => {
+	const answer = (value: number) => async () => Response.json({ status: 'success', data: { result: [{ metric: {}, value: [0, String(value)] }] } });
+	vi.stubGlobal('fetch', answer(0));
+	expect((await evaluateProofs('epochcloud-demo-dev', 'linkerd')).find((proof) => proof.id === 'plaintext-inbound')?.state).toBe('ok');
+	vi.stubGlobal('fetch', answer(1));
+	expect((await evaluateProofs('epochcloud-demo-dev', 'linkerd')).find((proof) => proof.id === 'plaintext-inbound')?.state).toBe('failed');
 });
 
 it('tells a query that answered with no data from one that failed', async () => {

@@ -12,6 +12,8 @@ export interface Proof {
 	query: string;
 	unit: string;
 	healthy?: { min?: number; max?: number };
+	/** The row counts traffic: no traffic reads "nodata", never "failed". */
+	traffic?: boolean;
 	/** Split the answer by this label and list each series. */
 	by?: string;
 }
@@ -23,7 +25,7 @@ export const PROOFS: Proof[] = [
 		title: 'Requests served in the last 10 minutes (kubelet health probes left out)',
 		query: 'sum(increase(epochcloud_http_requests_total{NS,path!="/health"}[10m]))',
 		unit: 'requests',
-		healthy: { min: 1 }
+		traffic: true
 	},
 	{
 		id: 'error-share',
@@ -67,19 +69,36 @@ export const PROOFS: Proof[] = [
 		by: 'pod'
 	},
 	{
+		// Traefik keeps a series for as long as it runs, so a change over the
+		// window is what shows a request. A series that first appears inside the
+		// window has no earlier sample to increase from; each such series adds one,
+		// so the figure is a lower bound.
 		id: 'entrypoint-requests',
 		group: 'linkerd',
-		title: 'Requests that came through the entrypoint in the last 10 minutes',
-		query: 'sum(increase(traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"}[10m]))',
-		unit: 'requests'
+		title: 'Requests that came through the entrypoint in the last 10 minutes (at least)',
+		query:
+			'(sum(increase(traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"}[10m])) or vector(0)) + (count(traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"} unless traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"} offset 10m) or vector(0))',
+		unit: 'requests',
+		traffic: true
 	},
 	{
+		// The proxy drops a series that stays idle and recreates it at 1 on the
+		// next request, so a counter's increase misses a request on a recreated
+		// series. A series that exists in the window is the evidence instead.
 		id: 'mtls-traefik',
 		group: 'linkerd',
-		title: 'Requests from Traefik over mTLS in the last 10 minutes',
-		query: 'sum(increase(request_total{NS,direction="inbound",tls="true",client_id=~"traefik\\\\.traefik\\\\..*"}[10m]))',
-		unit: 'requests',
-		healthy: { min: 1 }
+		title: 'Request series from Traefik over mTLS in the last 10 minutes',
+		query: 'count(last_over_time(request_total{NS,direction="inbound",srv_port="3000",tls="true",client_id=~"traefik\\\\.traefik\\\\..*"}[10m]))',
+		unit: 'series',
+		traffic: true
+	},
+	{
+		id: 'plaintext-inbound',
+		group: 'linkerd',
+		title: 'Request series that reached the app without mTLS (kubelet probes left out)',
+		query: 'count(last_over_time(request_total{NS,direction="inbound",srv_port="3000",tls!="true",authz_name!="probe"}[10m])) or vector(0)',
+		unit: 'series',
+		healthy: { max: 0 }
 	},
 	{
 		id: 'inbound-callers',
@@ -106,8 +125,10 @@ export interface ProofResult {
 }
 
 export function judge(proof: Proof, value: number | null): ProofResult['state'] {
-	if (!proof.healthy) return 'info';
+	if (!proof.healthy && !proof.traffic) return 'info';
 	if (value === null || Number.isNaN(value)) return 'nodata';
+	if (proof.traffic && value === 0) return 'nodata';
+	if (!proof.healthy) return 'ok';
 	if (proof.healthy.min !== undefined && value < proof.healthy.min) return 'failed';
 	if (proof.healthy.max !== undefined && value > proof.healthy.max) return 'failed';
 	return 'ok';
