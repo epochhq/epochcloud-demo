@@ -50,7 +50,7 @@ defineChecks([
 	{
 		name: 'defectdojo',
 		enabled: () => config.defectdojo.enabled,
-		missing: 'DefectDojo not configured',
+		missing: 'Unavailable: the platform offers apps no read-only DefectDojo identity yet',
 		everyMs: 60_000,
 		run: async () => ({ ...(await getDefectDojoSummary()) })
 	},

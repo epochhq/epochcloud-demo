@@ -8,7 +8,7 @@ const { sendEmail, publish, claimCooldown, config } = vi.hoisted(() => ({
 		hostname: 'pod-a',
 		environment: 'dev',
 		smtp: { enabled: true },
-		ntfy: { enabled: true, topicPrefix: 'epochcloud-demo', url: 'http://ntfy.test', user: '', password: '' },
+		ntfy: { enabled: true, topicPrefix: 'epochcloud-demo', url: 'http://ntfy.test', user: 'app', password: 'secret' },
 		betterauth: { enabled: true, url: 'http://auth.test' }
 	}
 }));
@@ -84,6 +84,20 @@ it('allows one test mail per cooldown window', async () => {
 	const response = await call(sendMail as Handler, { cookie: 'verified-a' });
 	expect(response.status).toBe(429);
 	expect(sendEmail).not.toHaveBeenCalled();
+});
+
+it('does not publish, and says why, while the app has no ntfy credential of its own', async () => {
+	config.ntfy.user = '';
+	config.ntfy.password = '';
+	try {
+		const response = await call(sendNotification as Handler, { cookie: 'verified-a' });
+		expect(response.status).toBe(503);
+		expect(await response.json()).toMatchObject({ reason: 'unavailable' });
+		expect(claimCooldown).not.toHaveBeenCalled();
+	} finally {
+		config.ntfy.user = 'app';
+		config.ntfy.password = 'secret';
+	}
 });
 
 it('derives the notification topic from the session user, never from the request', () => {

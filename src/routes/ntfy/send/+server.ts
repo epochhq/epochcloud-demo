@@ -13,6 +13,12 @@ export const POST: RequestHandler = async ({ request }) => {
 	const auth = await guard(request, { write: true });
 	if ('refusal' in auth) return auth.refusal;
 	if (!config.ntfy.enabled) return unavailable('ntfy');
+	// Publishing needs a user that may write only this app's topics. The platform
+	// has no per-app ntfy user yet, and the platform admin user is never copied
+	// into the app, so without a credential the action says so and does nothing.
+	if (!config.ntfy.user || !config.ntfy.password) {
+		return json({ success: false, reason: 'unavailable', error: 'Unavailable: the platform offers apps no ntfy user restricted to their own topics yet' }, 503);
+	}
 	const topic = topicFor(auth.session.user.id);
 
 	if (!(await claimCooldown(`ntfy:${auth.session.user.id}`, COOLDOWN_SECONDS))) {
