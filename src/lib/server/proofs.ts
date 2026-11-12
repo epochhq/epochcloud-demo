@@ -69,36 +69,30 @@ export const PROOFS: Proof[] = [
 		by: 'pod'
 	},
 	{
-		// Traefik keeps a series for as long as it runs, so a change over the
-		// window is what shows a request. A series that first appears inside the
-		// window has no earlier sample to increase from; each such series adds one,
-		// so the figure is a lower bound.
+		// Traefik keeps a series for as long as it runs, so the increase over the
+		// window counts the requests that came. A request that creates its series
+		// is not in the figure.
 		id: 'entrypoint-requests',
 		group: 'linkerd',
-		title: 'Requests that came through the entrypoint in the last 10 minutes (at least)',
-		query:
-			'(sum(increase(traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"}[10m])) or vector(0)) + (count(traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"} unless traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"} offset 10m) or vector(0))',
+		title: 'Requests that came through the entrypoint in the last 10 minutes',
+		query: 'sum(increase(traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"}[10m])) or vector(0)',
 		unit: 'requests',
 		traffic: true
 	},
 	{
 		// The proxy drops a series that stays idle and recreates it at 1 on the
 		// next request, so a counter's increase misses a request on a recreated
-		// series. A series that exists in the window is the evidence instead.
+		// series. A series that exists in the window is the evidence instead. The
+		// app's pods are told from the other workloads on port 3000 in the
+		// namespace (the BetterAuth pods) by their name: the Rollout's
+		// pod-template hash and a five character suffix.
 		id: 'mtls-traefik',
 		group: 'linkerd',
 		title: 'Request series from Traefik over mTLS in the last 10 minutes',
-		query: 'count(last_over_time(request_total{NS,direction="inbound",srv_port="3000",tls="true",client_id=~"traefik\\\\.traefik\\\\..*"}[10m]))',
+		query:
+			'count(last_over_time(request_total{NS,direction="inbound",srv_port="3000",pod=~"epochcloud-demo-[0-9a-f]{8,10}-[a-z0-9]{5}",tls="true",client_id=~"traefik\\\\.traefik\\\\..*"}[10m]))',
 		unit: 'series',
 		traffic: true
-	},
-	{
-		id: 'plaintext-inbound',
-		group: 'linkerd',
-		title: 'Request series that reached the app without mTLS (kubelet probes left out)',
-		query: 'count(last_over_time(request_total{NS,direction="inbound",srv_port="3000",tls!="true",authz_name!="probe"}[10m])) or vector(0)',
-		unit: 'series',
-		healthy: { max: 0 }
 	},
 	{
 		id: 'inbound-callers',

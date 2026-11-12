@@ -18,12 +18,6 @@ it('leaves kubelet health probes out of the request, error-share and latency pro
 	for (const id of ['requests', 'error-share', 'p95']) expect(PROOFS.find((proof) => proof.id === id)?.query, id).toContain('/health');
 });
 
-it('leaves kubelet probes out of the plaintext proof, so only a real caller without mTLS fails it', () => {
-	const query = PROOFS.find((proof) => proof.id === 'plaintext-inbound')!.query;
-	expect(query).toContain('tls!="true"');
-	expect(query).toContain('authz_name!="probe"');
-});
-
 it('substitutes the namespace matcher and the service name exactly, and refuses a namespace that could end the quote', async () => {
 	const queries: string[] = [];
 	vi.stubGlobal('fetch', async (url: string) => {
@@ -78,14 +72,6 @@ it('reads No data, never Failed, on a row that counts traffic when nothing came'
 	vi.stubGlobal('fetch', answer(3));
 	const proofs = await evaluateProofs('epochcloud-demo-dev');
 	for (const id of traffic) expect(proofs.find((proof) => proof.id === id)?.state, id).toBe('ok');
-});
-
-it('fails the plaintext row on a series without mTLS and passes it on none', async () => {
-	const answer = (value: number) => async () => Response.json({ status: 'success', data: { result: [{ metric: {}, value: [0, String(value)] }] } });
-	vi.stubGlobal('fetch', answer(0));
-	expect((await evaluateProofs('epochcloud-demo-dev', 'linkerd')).find((proof) => proof.id === 'plaintext-inbound')?.state).toBe('ok');
-	vi.stubGlobal('fetch', answer(1));
-	expect((await evaluateProofs('epochcloud-demo-dev', 'linkerd')).find((proof) => proof.id === 'plaintext-inbound')?.state).toBe('failed');
 });
 
 it('tells a query that answered with no data from one that failed', async () => {
