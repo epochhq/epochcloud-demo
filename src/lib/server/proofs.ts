@@ -20,8 +20,8 @@ export const PROOFS: Proof[] = [
 	{
 		id: 'requests',
 		group: 'prometheus',
-		title: 'Requests served in the last 10 minutes',
-		query: 'sum(increase(epochcloud_http_requests_total{NS}[10m]))',
+		title: 'Requests served in the last 10 minutes (kubelet health probes left out)',
+		query: 'sum(increase(epochcloud_http_requests_total{NS,path!="/health"}[10m]))',
 		unit: 'requests',
 		healthy: { min: 1 }
 	},
@@ -29,15 +29,16 @@ export const PROOFS: Proof[] = [
 		id: 'error-share',
 		group: 'prometheus',
 		title: 'Share of requests answered with a 5xx',
-		query: 'sum(rate(epochcloud_http_requests_total{NS,status=~"5.."}[10m])) / sum(rate(epochcloud_http_requests_total{NS}[10m]))',
+		query:
+			'sum(rate(epochcloud_http_requests_total{NS,path!="/health",status=~"5.."}[10m])) / sum(rate(epochcloud_http_requests_total{NS,path!="/health"}[10m]))',
 		unit: 'ratio',
 		healthy: { max: 0.05 }
 	},
 	{
 		id: 'p95',
 		group: 'prometheus',
-		title: '95th percentile latency of the app routes',
-		query: 'histogram_quantile(0.95, sum by (le) (rate(epochcloud_http_request_duration_seconds_bucket{NS,path!~"/status/.*|/chaos"}[10m])))',
+		title: '95th percentile latency of the app routes (health probes and status routes left out)',
+		query: 'histogram_quantile(0.95, sum by (le) (rate(epochcloud_http_request_duration_seconds_bucket{NS,path!~"/health|/status/.*"}[10m])))',
 		unit: 's',
 		healthy: { max: 0.5 }
 	},

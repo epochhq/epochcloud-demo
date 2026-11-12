@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vite-plus/test';
-import { defineChecks, refresh, resetSnapshots, snapshotResponse, tick } from '../../src/lib/server/snapshot.js';
+import { NotRunning, defineChecks, refresh, resetSnapshots, snapshotResponse, tick } from '../../src/lib/server/snapshot.js';
 
 // The anonymous page reads a stored snapshot. These tests pin that a request
 // never triggers a check, that a failure is never reported as connected, and
@@ -14,7 +14,7 @@ beforeEach(() => {
 });
 
 it('serves the stored result and never runs a check because a request arrived', async () => {
-	expect(snapshotResponse('db').status).toBe(503);
+	expect(snapshotResponse('db').status).toBe(200);
 	await refresh('db', 1_000);
 	run.mockClear();
 	for (let i = 0; i < 5; i++) expect(snapshotResponse('db', 3_000).status).toBe(200);
@@ -45,4 +45,27 @@ it('reports a timeout when the deadline passes while the check is still waiting'
 	const pending = refresh('db', 1_000, deadline.signal);
 	deadline.abort(new globalThis.DOMException('deadline', 'TimeoutError'));
 	expect(await pending).toMatchObject({ connected: false, timeout: true, error: 'timed out' });
+});
+
+it('answers 200 with state not-running, never a 5xx, for a check that did not run', async () => {
+	expect(snapshotResponse('db').status).toBe(200);
+	expect(await snapshotResponse('db').json()).toMatchObject({ connected: false, state: 'not-running' });
+
+	defineChecks([{ name: 'off', enabled: () => false, missing: 'Unavailable: needs a platform key', run, everyMs: 30_000 }]);
+	await refresh('off', 1_000);
+	const off = snapshotResponse('off', 1_000);
+	expect(off.status).toBe(200);
+	expect(await off.json()).toMatchObject({ connected: false, state: 'not-running', reason: 'Unavailable: needs a platform key' });
+	expect(run).not.toHaveBeenCalled();
+
+	run.mockRejectedValue(new NotRunning('no traffic yet'));
+	await refresh('db', 2_000);
+	const quiet = snapshotResponse('db', 2_000);
+	expect(quiet.status).toBe(200);
+	expect(await quiet.json()).toMatchObject({ state: 'not-running', reason: 'no traffic yet' });
+});
+
+it('never reports an unconfigured check as connected', async () => {
+	defineChecks([{ name: 'off', enabled: () => false, missing: 'not configured', run, everyMs: 30_000 }]);
+	expect((await refresh('off', 1_000)).connected).toBe(false);
 });

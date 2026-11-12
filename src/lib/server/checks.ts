@@ -9,7 +9,7 @@ import { pingValkey } from './valkey.js';
 import { currentNamespace } from './namespace.js';
 import { evaluateProofs } from './proofs.js';
 import { prometheusEnabled } from './prometheus.js';
-import { defineChecks } from './snapshot.js';
+import { NotRunning, defineChecks } from './snapshot.js';
 
 // Every integration the page reports on, as data. Each run proves its
 // capability against the real service: a round trip, a query, or a handshake.
@@ -103,7 +103,9 @@ defineChecks([
 			const namespace = currentNamespace();
 			if (!namespace) throw new Error('namespace unknown');
 			const [proof] = await evaluateProofs(namespace, 'linkerd');
-			if (proof?.state !== 'ok') throw new Error('no mTLS request from Traefik counted by the proxies');
+			// No request through the entrypoint in the window is not a failure of the
+			// mesh: there is nothing to show yet.
+			if (proof?.state !== 'ok') throw new NotRunning('No request came through the entrypoint in the last 10 minutes');
 			return { mtls_requests_10m: Math.round(proof.value ?? 0) };
 		}
 	},

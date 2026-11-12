@@ -24,6 +24,8 @@
 			<path d="M3 8.5l3.2 3.2L13 4.8" />
 		{:else if state === 'failed'}
 			<path d="M4 4l8 8M12 4l-8 8" />
+		{:else if state === 'notrunning'}
+			<path d="M4 8h8" />
 		{:else if state === 'slow'}
 			<circle
 				cx="8"

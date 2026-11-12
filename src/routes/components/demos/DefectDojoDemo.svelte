@@ -42,7 +42,7 @@
 			</div>
 		</div>
 	{/if}
-	{#if enabled && domain}
+	{#if domain}
 		<a
 			href="https://defectdojo.{domain}"
 			target="_blank"
@@ -50,8 +50,6 @@
 			class="btn btn-ghost btn-sm w-full"
 			style="margin-top:0.5rem">Open Dashboard</a
 		>
-	{:else if !enabled}
-		<p class="disabled-msg">Not configured - DEFECTDOJO_URL not set</p>
 	{/if}
 </div>
 

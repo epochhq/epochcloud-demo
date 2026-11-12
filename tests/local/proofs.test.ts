@@ -6,12 +6,16 @@ vi.mock('#lib/server/config.js', () => ({ config: { podNamespace: '' } }));
 import { PROOFS, evaluateProofs, judge } from '../../src/lib/server/proofs.js';
 import { namespaceFrom } from '../../src/lib/server/namespace.js';
 
-// The Prometheus and Linkerd tabs show these queries' answers. The old panel
-// summed every namespace; the guard here is that no proof can be written
-// without the namespace matcher.
+// The Prometheus and Linkerd tabs show these queries' answers. No proof can be
+// written without the namespace matcher, and the three request proofs leave the
+// kubelet's health probes out.
 
 it('limits every proof query to the namespace', () => {
 	for (const proof of PROOFS) expect(proof.query, proof.id).toContain('{NS');
+});
+
+it('leaves kubelet health probes out of the request, error-share and latency proofs', () => {
+	for (const id of ['requests', 'error-share', 'p95']) expect(PROOFS.find((proof) => proof.id === id)?.query, id).toContain('/health');
 });
 
 it('substitutes the namespace matcher, and refuses a namespace that could end the quote', async () => {

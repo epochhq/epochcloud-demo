@@ -17,87 +17,54 @@ vi.mock('#lib/server/config.js', () => ({ config }));
 vi.mock('#lib/server/logger.js', () => ({ log: vi.fn() }));
 vi.mock('#lib/server/smtp.js', () => ({ sendEmail }));
 vi.mock('#lib/server/valkey.js', () => ({ claimCooldown }));
-vi.mock('#lib/server/cnpg.js', () => ({ createItem: vi.fn(), listItems: vi.fn(), deleteItem: vi.fn() }));
 
 import { POST as sendMail } from '../../src/routes/email/send/+server.js';
 import { POST as sendNotification } from '../../src/routes/ntfy/send/+server.js';
-import { POST as createItem } from '../../src/routes/cnpg/items/+server.js';
-import { POST as chaos } from '../../src/routes/chaos/+server.js';
 import { isOwnTopic, topicFor, publish as realPublish } from '../../src/lib/server/ntfy.js';
 
-// BetterAuth answers get-session for the cookie the browser sent.
-const people: Record<string, { id: string; email: string; verified: boolean }> = {
-	'verified-a': { id: 'user-a', email: 'a@example.test', verified: true },
-	unverified: { id: 'user-u', email: 'u@example.test', verified: false }
-};
-vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
-	const who = people[String((init?.headers as Record<string, string> | undefined)?.cookie ?? '')];
-	if (!who) return Response.json(null);
-	return Response.json({ user: { id: who.id, email: who.email, name: 'N', emailVerified: who.verified }, session: { expiresAt: '2030-01-01T00:00:00Z' } });
-});
+// The hook (access.test.ts) decides who gets this far. These handlers act on
+// the session it hands them, never on anything the request names.
 
 type Handler = (event: never) => Promise<Response> | Response;
-function call(handler: Handler, options: { cookie?: string; fields?: Record<string, string>; type?: string | null } = {}) {
-	const headers: Record<string, string> = {};
-	if (options.cookie) headers.cookie = options.cookie;
-	const type = options.type === undefined ? 'application/x-www-form-urlencoded' : options.type;
-	if (type) headers['content-type'] = type;
-	const request = new Request('http://demo.test/x', { method: 'POST', headers, body: new URLSearchParams(options.fields ?? {}).toString() });
-	return handler({ request, fetch } as never);
-}
+const call = (handler: Handler, fields: Record<string, string> = {}, userId = 'user-a') => {
+	const request = new Request('http://demo.test/x?email=victim@example.test&topic=alerts', {
+		method: 'POST',
+		headers: { 'content-type': 'application/x-www-form-urlencoded' },
+		body: new URLSearchParams(fields).toString()
+	});
+	return handler({
+		request,
+		locals: { session: { user: { id: userId, email: `${userId}@example.test`, name: 'N', emailVerified: true }, expiresAt: '' } }
+	} as never);
+};
 
 beforeEach(() => {
 	sendEmail.mockReset().mockResolvedValue(undefined);
 	publish.mockReset();
 	claimCooldown.mockReset().mockResolvedValue(true);
-});
-
-it.each([
-	['mail', sendMail],
-	['notification', sendNotification],
-	['item', createItem],
-	['chaos', chaos]
-])('refuses an anonymous or unverified %s request with a JSON reason before doing anything', async (_name, handler) => {
-	const anonymous = await call(handler as Handler, { fields: { action: 'cpu', text: 'x' } });
-	expect(anonymous.status).toBe(401);
-	expect(await anonymous.json()).toMatchObject({ success: false, reason: 'unauthenticated' });
-	const unverified = await call(handler as Handler, { cookie: 'unverified', fields: { action: 'cpu', text: 'x' } });
-	expect(unverified.status).toBe(403);
-	expect(await unverified.json()).toMatchObject({ reason: 'unverified' });
-	expect(sendEmail).not.toHaveBeenCalled();
-	expect(claimCooldown).not.toHaveBeenCalled();
-});
-
-it('accepts only form-encoded POSTs, so the framework origin check always applies', async () => {
-	for (const type of ['application/json', null]) expect((await call(sendMail as Handler, { cookie: 'verified-a', type })).status).toBe(415);
-	expect(sendEmail).not.toHaveBeenCalled();
+	config.ntfy.user = 'app';
+	config.ntfy.password = 'secret';
 });
 
 it('mails the session address and ignores any recipient in the request', async () => {
-	const response = await call(sendMail as Handler, { cookie: 'verified-a', fields: { email: 'victim@example.test', to: 'victim@example.test' } });
+	const response = await call(sendMail as Handler, { email: 'victim@example.test', to: 'victim@example.test' });
 	expect(response.status).toBe(200);
-	expect(sendEmail).toHaveBeenCalledExactlyOnceWith('a@example.test');
+	expect(sendEmail).toHaveBeenCalledExactlyOnceWith('user-a@example.test');
 });
 
 it('allows one test mail per cooldown window', async () => {
 	claimCooldown.mockResolvedValue(false);
-	const response = await call(sendMail as Handler, { cookie: 'verified-a' });
-	expect(response.status).toBe(429);
+	expect((await call(sendMail as Handler)).status).toBe(429);
 	expect(sendEmail).not.toHaveBeenCalled();
 });
 
 it('does not publish, and says why, while the app has no ntfy credential of its own', async () => {
 	config.ntfy.user = '';
 	config.ntfy.password = '';
-	try {
-		const response = await call(sendNotification as Handler, { cookie: 'verified-a' });
-		expect(response.status).toBe(503);
-		expect(await response.json()).toMatchObject({ reason: 'unavailable' });
-		expect(claimCooldown).not.toHaveBeenCalled();
-	} finally {
-		config.ntfy.user = 'app';
-		config.ntfy.password = 'secret';
-	}
+	const response = await call(sendNotification as Handler);
+	expect(response.status).toBe(503);
+	expect(await response.json()).toMatchObject({ reason: 'unavailable' });
+	expect(claimCooldown).not.toHaveBeenCalled();
 });
 
 it('derives the notification topic from the session user, never from the request', () => {

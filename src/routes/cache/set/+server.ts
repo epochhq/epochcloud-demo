@@ -1,5 +1,4 @@
 import type { RequestHandler } from './$types';
-import { guard } from '#lib/server/guard.js';
 import { field, json } from '#lib/server/http.js';
 import { valkeySet } from '#lib/server/valkey.js';
 
@@ -9,8 +8,6 @@ const MAX_TTL = 3600;
 // The shared Valkey belongs to the platform, so the demo writes only keys under
 // its own prefix, short ones, and always with an expiry.
 export const POST: RequestHandler = async ({ request }) => {
-	const auth = await guard(request, { write: true });
-	if ('refusal' in auth) return auth.refusal;
 	const form = await request.formData();
 	const key = field(form, 'key', 'demo-key');
 	const value = field(form, 'value').slice(0, 200) || `demo-value-${Date.now()}`;

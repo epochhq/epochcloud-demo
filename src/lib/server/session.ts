@@ -1,21 +1,27 @@
 import { config } from './config.js';
-import { json, upstream } from './http.js';
+import { SESSION_TIMEOUT_MS } from '../limits.js';
+import { upstream } from './http.js';
 
 export interface Session {
 	user: { id: string; email: string; name: string; emailVerified: boolean };
 	expiresAt: string;
 }
 
+/** True when the request carries a BetterAuth session cookie (`<prefix>.session_token`). */
+export function hasSessionCookie(request: Request): boolean {
+	return (request.headers.get('cookie') ?? '').split(';').some((pair) => (pair.split('=')[0]?.trim() ?? '').endsWith('session_token'));
+}
+
 /**
- * The BetterAuth session behind the request's cookies, or null. The lookup is
- * the only source of identity: handlers never read a user or address from the
- * request itself.
+ * The BetterAuth session behind the request's cookies, or null. This is the one
+ * function the app asks who is signed in; the login behind it is replaceable.
+ * With no session cookie there is nothing to look up, so a visitor without one
+ * never causes an upstream call.
  */
 export async function getSession(request: Request): Promise<Session | null> {
-	if (!config.betterauth.enabled) return null;
-	const cookie = request.headers.get('cookie');
-	if (!cookie) return null;
-	const resp = await upstream(`${config.betterauth.url}/api/auth/get-session`, { headers: { cookie } });
+	if (!config.betterauth.enabled || !hasSessionCookie(request)) return null;
+	const cookie = request.headers.get('cookie') ?? '';
+	const resp = await upstream(`${config.betterauth.url}/api/auth/get-session`, { headers: { cookie } }, SESSION_TIMEOUT_MS);
 	if (!resp.ok) return null;
 	const body = (await resp.json().catch(() => null)) as { user?: Record<string, unknown>; session?: Record<string, unknown> } | null;
 	const user = body?.user;
@@ -25,19 +31,4 @@ export async function getSession(request: Request): Promise<Session | null> {
 		user: { id: user.id, email: user.email, name: typeof user.name === 'string' ? user.name : '', emailVerified: user.emailVerified === true },
 		expiresAt: typeof session.expiresAt === 'string' ? session.expiresAt : ''
 	};
-}
-
-/** A verified session, or the JSON refusal that says why there is none. */
-export async function requireVerifiedSession(request: Request): Promise<{ session: Session } | { refusal: Response }> {
-	let session: Session | null;
-	try {
-		session = await getSession(request);
-	} catch (err) {
-		return {
-			refusal: json({ success: false, reason: 'auth-unavailable', error: `session lookup failed: ${String(err instanceof Error ? err.message : err)}` }, 503)
-		};
-	}
-	if (!session) return { refusal: json({ success: false, reason: 'unauthenticated', error: 'sign in to try this' }, 401) };
-	if (!session.user.emailVerified) return { refusal: json({ success: false, reason: 'unverified', error: 'verify your email address to try this' }, 403) };
-	return { session };
 }

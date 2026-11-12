@@ -1,16 +1,14 @@
 import { config } from './config.js';
-import { IDLE_TIMEOUT_SECONDS } from '../limits.js';
+import { KNATIVE_ATTEMPTS, KNATIVE_ATTEMPT_MS, KNATIVE_BACKOFF_MS } from '../limits.js';
 
 // Scale-from-zero window: the Kourier/activator path can return an empty or
 // non-JSON body (or a transient 503) for the first request while the pod is
 // still cold. Retries land on the warmed pod. The whole sequence is bounded
-// below the server's idle timeout, because a request that outlives it is cut
-// without a body.
-export const MAX_ATTEMPTS = 2;
-export const ATTEMPT_TIMEOUT_MS = 3_000;
-export const RETRY_BACKOFF_MS = 750;
-export const WORST_CASE_MS = MAX_ATTEMPTS * ATTEMPT_TIMEOUT_MS + RETRY_BACKOFF_MS * ((MAX_ATTEMPTS * (MAX_ATTEMPTS - 1)) / 2);
-if (WORST_CASE_MS >= IDLE_TIMEOUT_SECONDS * 1000 * 0.8) throw new Error('Knative retry budget exceeds the server idle timeout');
+// (KNATIVE_WORST_CASE_MS in limits.ts), because a request that outlives the
+// server's idle timeout is cut without a body.
+export const MAX_ATTEMPTS = KNATIVE_ATTEMPTS;
+export const ATTEMPT_TIMEOUT_MS = KNATIVE_ATTEMPT_MS;
+export const RETRY_BACKOFF_MS = KNATIVE_BACKOFF_MS;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -1,6 +1,7 @@
 import amqplib, { type ChannelModel, type ConfirmChannel } from 'amqplib';
 import { config } from './config.js';
-import { UPSTREAM_TIMEOUT_MS } from '../limits.js';
+import { PUBLISH_CONFIRM_MS, UPSTREAM_TIMEOUT_MS } from '../limits.js';
+import { withDeadline } from './http.js';
 import { log } from './logger.js';
 import { rabbitConnected, rabbitMessagesPublished, rabbitMessagesConsumed, rabbitPublishErrors } from './metrics.js';
 
@@ -9,17 +10,8 @@ let channel: ConfirmChannel | null = null;
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let backoffMs = 1000;
 const MAX_BACKOFF = 30000;
-const PUBLISH_CONFIRM_TIMEOUT_MS = 5000;
+const PUBLISH_CONFIRM_TIMEOUT_MS = PUBLISH_CONFIRM_MS;
 const BROKER_PROBE_TIMEOUT_MS = 2000;
-
-/** Ends a wait that the broker never answers, so no request outlives the server's idle timeout. */
-function withDeadline<T>(work: Promise<T>, ms = UPSTREAM_TIMEOUT_MS): Promise<T> {
-	let timer: ReturnType<typeof setTimeout>;
-	const deadline = new Promise<never>((_, reject) => {
-		timer = setTimeout(() => reject(new Error(`no answer from the broker within ${ms}ms`)), ms);
-	});
-	return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
-}
 
 const consumedMessages: Array<{ message: string; timestamp: string }> = [];
 const MAX_CONSUMED = 10;
@@ -34,7 +26,7 @@ async function connect(): Promise<void> {
 	if (!config.rabbitmq.enabled) return;
 
 	try {
-		connection = await withDeadline(amqplib.connect(getUrl()));
+		connection = await withDeadline(amqplib.connect(getUrl()), UPSTREAM_TIMEOUT_MS, 'the broker');
 
 		// Register event handlers IMMEDIATELY after connect, before createChannel.
 		// If the connection drops before handlers are attached, Node.js throws
@@ -79,7 +71,7 @@ async function connect(): Promise<void> {
 		// the type-mismatch fails the channel with PRECONDITION_FAILED.
 		// checkQueue only verifies existence; the operator stays the
 		// single source of truth for queue type / durability / args.
-		await withDeadline(ch.checkQueue(config.rabbitmq.queue));
+		await withDeadline(ch.checkQueue(config.rabbitmq.queue), UPSTREAM_TIMEOUT_MS, 'the broker');
 
 		// A consumer lives on the channel, so every new channel needs its own
 		// subscription: after a reconnect the old one is gone.
@@ -201,7 +193,7 @@ export async function getQueueInfo() {
 	if (!channel) {
 		throw new Error('RabbitMQ not connected');
 	}
-	const info = await withDeadline(channel.checkQueue(config.rabbitmq.queue));
+	const info = await withDeadline(channel.checkQueue(config.rabbitmq.queue), UPSTREAM_TIMEOUT_MS, 'the broker');
 	return {
 		messageCount: info.messageCount,
 		consumerCount: info.consumerCount

@@ -5,9 +5,11 @@ export interface Entry {
 	state: CheckState;
 	detail: string;
 	data: Record<string, unknown> | null;
+	/** When the answer arrived in this browser, for a live age. */
+	at: number;
 }
 
-const UNCHECKED: Entry = { state: 'unchecked', detail: '', data: null };
+const UNCHECKED: Entry = { state: 'unchecked', detail: '', data: null, at: 0 };
 
 /** One entry per integration, shared by the tab pills and the panels. */
 export class StatusBoard {
@@ -18,9 +20,9 @@ export class StatusBoard {
 	}
 
 	async run(key: string, url: string, options: CheckOptions = {}): Promise<void> {
-		this.entries[key] = { state: 'checking', detail: '', data: null };
+		this.entries[key] = { state: 'checking', detail: '', data: null, at: 0 };
 		const result = await runCheck(url, options);
-		this.entries[key] = { state: result.state, detail: result.detail, data: result.data };
+		this.entries[key] = { state: result.state, detail: result.detail, data: result.data, at: Date.now() };
 	}
 }
 

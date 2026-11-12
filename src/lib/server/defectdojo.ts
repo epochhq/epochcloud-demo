@@ -10,14 +10,6 @@ export interface DefectDojoSummary {
 	findings: { total: number; by_severity: Record<string, number> };
 }
 
-// The summary changes slowly and each refresh costs several API calls, so it
-// is cached. Only a complete, successful summary is kept: a failure is never
-// served from the cache, so recovery shows on the next request.
-export const CACHE_TTL_MS = 60_000;
-
-let cached: { at: number; value: DefectDojoSummary } | null = null;
-let inFlight: Promise<DefectDojoSummary> | null = null;
-
 async function get(path: string, endpoint: string): Promise<{ count?: unknown; results?: Array<{ id?: number; name?: string }> }> {
 	const resp = await upstream(`${config.defectdojo.url}${path}`, {
 		headers: { Authorization: `Token ${config.defectdojo.token}`, 'Content-Type': 'application/json' }
@@ -51,28 +43,16 @@ async function fetchSummary(): Promise<DefectDojoSummary> {
 	return { product: name, findings: { total, by_severity: Object.fromEntries(SEVERITIES.map((severity, i) => [severity, perSeverity[i] ?? 0])) } };
 }
 
-/** Connected only when every upstream call succeeded; otherwise it throws. */
-export async function getDefectDojoSummary(now = Date.now()): Promise<DefectDojoSummary> {
-	if (cached && now - cached.at < CACHE_TTL_MS) return cached.value;
-	inFlight ??= fetchSummary()
-		.then((value) => {
-			cached = { at: Date.now(), value };
-			defectdojoConnected.set(1);
-			return value;
-		})
-		.catch((err) => {
-			defectdojoConnected.set(0);
-			throw err;
-		})
-		.finally(() => {
-			inFlight = null;
-		});
-	return inFlight;
-}
-
-export function resetDefectDojoCache(): void {
-	cached = null;
-	inFlight = null;
+/** Connected only when every upstream call succeeded; otherwise it throws. The server's status snapshot is the cache. */
+export async function getDefectDojoSummary(): Promise<DefectDojoSummary> {
+	try {
+		const summary = await fetchSummary();
+		defectdojoConnected.set(1);
+		return summary;
+	} catch (err) {
+		defectdojoConnected.set(0);
+		throw err;
+	}
 }
 
 export async function initDefectDojo(): Promise<void> {

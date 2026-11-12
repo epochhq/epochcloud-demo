@@ -5,11 +5,14 @@ import { isTimeout, json } from './http.js';
 // schedule. A visitor loading the page never causes an upstream call: the
 // work is bounded by the check count and the interval, not by traffic.
 
+/** Thrown by a check that could not run for a reason that is not a failure (no traffic yet, say). */
+export class NotRunning extends Error {}
+
 export interface Check {
 	name: string;
 	/** False when the integration is not configured. */
 	enabled: () => boolean;
-	/** Why it is not configured, shown instead of a result. */
+	/** Why it is not running when it is not configured or unavailable by design; shown instead of a result. */
 	missing: string;
 	/** Resolves with extra fields when healthy; throws when not. */
 	run: (signal: AbortSignal) => Promise<Record<string, unknown> | void>;
@@ -19,8 +22,10 @@ export interface Check {
 
 export interface Snapshot {
 	connected: boolean;
+	/** "not-running": the check did not run, which is not a failure and carries no 5xx. */
+	state?: 'not-running';
+	reason?: string;
 	timeout?: boolean;
-	configured?: boolean;
 	error?: string;
 	checkedAt: number;
 	[extra: string]: unknown;
@@ -50,11 +55,16 @@ export async function refresh(name: string, now = Date.now(), signal = AbortSign
 	lastRun.set(name, now);
 	let snapshot: Snapshot;
 	if (!check.enabled()) {
-		snapshot = { connected: false, configured: false, error: check.missing, checkedAt: now };
+		snapshot = { connected: false, state: 'not-running', reason: check.missing, checkedAt: now };
 	} else {
 		try {
 			snapshot = { connected: true, ...(await abortable(check.run(signal), signal)), checkedAt: now };
 		} catch (err) {
+			if (err instanceof NotRunning) {
+				snapshot = { connected: false, state: 'not-running', reason: err.message, checkedAt: now };
+				results.set(name, snapshot);
+				return snapshot;
+			}
 			// The raw error text can carry internal addresses; the page gets a
 			// category, the logs get the detail from the check itself.
 			snapshot = { connected: false, timeout: isTimeout(err), error: isTimeout(err) ? 'timed out' : 'the check failed', checkedAt: now };
@@ -80,9 +90,11 @@ export function snapshotResponse(name: string, now = Date.now()): Response {
 	const check = checks.get(name);
 	if (!check) return json({ connected: false, error: 'unknown check' }, 404);
 	const snapshot = results.get(name);
-	if (!snapshot) return json({ connected: false, pending: true, error: 'not checked yet' }, 503);
+	if (!snapshot) return json({ connected: false, state: 'not-running', reason: 'the first check has not finished yet' });
 	const { checkedAt, ...rest } = snapshot;
-	return json({ ...rest, age_seconds: Math.max(0, Math.round((now - checkedAt) / 1000)) }, snapshot.connected ? 200 : 503);
+	// A check that did not run is not a failure: 200, never a 5xx. Only a check that
+	// ran and found its integration down answers 503.
+	return json({ ...rest, age_seconds: Math.max(0, Math.round((now - checkedAt) / 1000)) }, snapshot.connected || snapshot.state === 'not-running' ? 200 : 503);
 }
 
 export function resetSnapshots(): void {

@@ -1,14 +1,12 @@
 import type { RequestHandler } from './$types';
 import { config } from '#lib/server/config.js';
-import { guard, unavailable } from '#lib/server/guard.js';
+import { unavailable } from '#lib/server/respond.js';
 import { field, json } from '#lib/server/http.js';
 import { invokeFibonacci, MAX_ATTEMPTS } from '#lib/server/knative.js';
 import { log } from '#lib/server/logger.js';
 
 // Spends a serverless invocation, so it is a signed-in POST.
 export const POST: RequestHandler = async ({ request }) => {
-	const auth = await guard(request, { write: true });
-	if ('refusal' in auth) return auth.refusal;
 	if (!config.knative.enabled) return unavailable('Knative');
 
 	const n = parseInt(field(await request.formData(), 'n', '10'));

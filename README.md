@@ -20,7 +20,6 @@ SvelteKit 3 and Svelte 5 demo app for the EpochCloud Kubernetes platform.
 - **Valkey** cache demo via `ioredis`
 - **DefectDojo** security status API client
 - **Email** via Maddy SMTP relay (nodemailer)
-- **Chaos testing** (error injection, slow responses, load simulation)
 - **BetterAuth** HTTP status and session forwarding to the standalone auth server
 - **Structured logging** (JSON via custom logger)
 - **Consumer mode** (KEDA-scaled queue consumer)
@@ -56,12 +55,11 @@ epochcloud-demo/
 │       ├── health/+server.ts     # GET /health
 │       ├── metrics/+server.ts    # GET /metrics
 │       ├── version/+server.ts    # GET /version
-│       ├── chaos/+server.ts      # GET /chaos
 │       ├── status/[name]/        # GET: the server's latest check of one integration
-│       ├── health/ version/ robots.txt/
+│       ├── robots.txt/           # GET /robots.txt
 │       ├── email/send            # POST, signed in: test mail to the session's address
 │       ├── ntfy/send, ntfy/topic # POST / GET, signed in: test notification to the user's own topic
-│       ├── rabbitmq/ cache/ cnpg/ features/ knative/ prometheus/increment chaos/
+│       ├── rabbitmq/ cache/ cnpg/ features/ knative/ prometheus/increment
 │       │                         # interactive demos, all signed in; writes are form POSTs
 │       └── auth/session          # GET: who the server sees behind the cookies
 └── renovate.json
@@ -108,15 +106,20 @@ model is documented in the epochcloud repo: keyless-signing.md.
 ## Public surface and timeouts
 
 The anonymous page reads a status snapshot that the server refreshes itself
-(`src/lib/server/snapshot.ts`, `checks.ts`): a visitor never causes an upstream
-call. Every route that writes, sends, spends or looks something up on request
-needs the app's own sign-in, is a form-encoded POST so SvelteKit's origin check
-always applies (`src/lib/server/guard.ts`), and takes no target (address, topic,
-key, URL) from the request. Bun cuts a request that writes nothing for its idle
-timeout and the app would still log 200 for it, so the timeout is stated in
-`src/lib/limits.ts` at Bun's default and every outbound call and deliberate delay
-is bounded well below it; `tests/local/budgets.test.ts` keeps it that way. The
-Prometheus and Linkerd tabs render a data array of namespace-limited queries
+(`src/lib/server/snapshot.ts`, `checks.ts`): a visitor without a session cookie
+never causes an upstream call, and a check that did not run (not configured,
+unavailable until the platform offers a credential, no traffic yet) answers 200
+with `state: not-running`, never a 5xx. Every other route needs the app's own
+sign-in, decided once in the `handle` hook (`src/lib/server/access.ts`), is a
+form-encoded POST when it changes anything so SvelteKit's origin check always
+applies, and takes no address, topic or URL from the request; the cache routes
+take a key of up to 64 characters, always under the `demo:` prefix.
+
+Bun cuts a request that writes nothing for its idle timeout, and the app would
+still log 200 for it. The timeout is stated in `src/lib/limits.ts` at Bun's
+default, every outbound call is bounded, and `HANDLER_WAITS` lists the whole
+chain of waits of each handler; `tests/local/budgets.test.ts` sums every chain.
+The Prometheus and Linkerd tabs render a data array of namespace-limited queries
 (`src/lib/server/proofs.ts`): one more entry proves one more capability.
 
 ## Environment Variables
@@ -240,17 +243,28 @@ in-browser signing approval - no cosign key, no SOPS, no cluster access. Copy
 
 ## API Routes
 
-| Path                 | Method   | Description                             |
-| -------------------- | -------- | --------------------------------------- |
-| `/`                  | GET      | Landing page                            |
-| `/health`            | GET      | Health check (always 200)               |
-| `/metrics`           | GET      | Prometheus scrape endpoint              |
-| `/version`           | GET      | Build info JSON                         |
-| `/chaos`             | GET      | `?action=error\|slow\|load&count=N`     |
-| `/rabbitmq/status`   | GET      | RabbitMQ connection + consumed messages |
-| `/rabbitmq/publish`  | GET/POST | Publish message to queue                |
-| `/cache/status`      | GET      | Valkey connection status                |
-| `/cache/set`         | GET      | Set key: `?key=...&value=...&ttl=300`   |
-| `/cache/get`         | GET      | Get key: `?key=...`                     |
-| `/defectdojo/status` | GET      | Products + findings summary             |
-| `/email/send`        | GET/POST | Send test email via Maddy               |
+Anonymous routes answer without a sign-in. Every other route needs a verified
+BetterAuth session, and a request that changes anything must be a form-encoded
+POST. `src/lib/server/access.ts` holds the list and `tests/local/access.test.ts`
+checks every route module against it.
+
+| Path                                  | Method    | Access    | Description                                                      |
+| ------------------------------------- | --------- | --------- | ---------------------------------------------------------------- |
+| `/`                                   | GET       | anonymous | Landing page                                                     |
+| `/health`                             | GET       | anonymous | Liveness and readiness (always 200)                              |
+| `/version`                            | GET       | anonymous | Build info JSON                                                  |
+| `/robots.txt`                         | GET       | anonymous | Crawler policy                                                   |
+| `/metrics`                            | GET       | anonymous | Prometheus scrape endpoint; the chart does not route it publicly |
+| `/status/<name>`                      | GET       | anonymous | The server's latest check of one integration                     |
+| `/auth/session`                       | GET       | anonymous | Who the server sees behind the session cookie                    |
+| `/api/faro/collect`                   | POST      | anonymous | Browser telemetry relay, size-capped and limited per client      |
+| `/email/send`                         | POST      | signed in | Test mail to the session's own address                           |
+| `/ntfy/send`, `/ntfy/topic`           | POST, GET | signed in | Test notification to the user's own topic, and that topic        |
+| `/rabbitmq/publish`                   | POST      | signed in | Publish a message to the queue                                   |
+| `/rabbitmq/consume`                   | GET       | signed in | Queue depth and consumed messages                                |
+| `/cache/set`, `/cache/get`            | POST, GET | signed in | Write or read a key under the `demo:` prefix                     |
+| `/cnpg/items`                         | GET, POST | signed in | List or add demo items                                           |
+| `/cnpg/items/delete`                  | POST      | signed in | Delete one demo item                                             |
+| `/features/all`, `/features/evaluate` | GET       | signed in | Evaluate feature flags                                           |
+| `/knative/invoke`                     | POST      | signed in | Invoke the serverless Fibonacci service                          |
+| `/prometheus/increment`               | POST      | signed in | Increment the demo counter on the answering pod                  |

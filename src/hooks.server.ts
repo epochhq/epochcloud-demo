@@ -9,6 +9,7 @@ import { initDefectDojo } from '#lib/server/defectdojo.js';
 import { initSmtp } from '#lib/server/smtp.js';
 import '#lib/server/checks.js';
 import { startSnapshots } from '#lib/server/snapshot.js';
+import { authorize } from '#lib/server/access.js';
 
 // --- Initialization (runs once on server start) ---
 
@@ -68,7 +69,7 @@ const METRIC_PATHS = [
 	'/health',
 	'/version',
 	'/robots.txt',
-	'/chaos',
+
 	'/email/send',
 	'/ntfy/send',
 	'/ntfy/topic',
@@ -129,6 +130,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (config.consumerMode && !consumerAllowedPaths.has(pathname)) {
 		return new Response('Consumer mode - only /health and /metrics available', { status: 404 });
 	}
+
+	// Sign-in, the form-POST rule and the per-user limit for every route that is
+	// not on the anonymous list (src/lib/server/access.ts).
+	let client = 'unknown';
+	try {
+		client = event.getClientAddress();
+	} catch {
+		// no address behind this connection: one shared bucket
+	}
+	const access = await authorize(event.request, pathname, client);
+	if ('refusal' in access) return withSecurityHeaders(access.refusal);
+	if (access.session) event.locals.session = access.session;
 
 	const start = performance.now();
 	const path = metricPath(pathname);

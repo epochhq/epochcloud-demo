@@ -1,11 +1,8 @@
 import type { RequestHandler } from './$types';
-import { guard } from '#lib/server/guard.js';
 import { json } from '#lib/server/http.js';
 import { getQueueInfo, getRabbitStatus } from '#lib/server/rabbitmq.js';
 
-export const GET: RequestHandler = async ({ request }) => {
-	const auth = await guard(request);
-	if ('refusal' in auth) return auth.refusal;
+export const GET: RequestHandler = async () => {
 	const status = await getRabbitStatus();
 	let queueInfo = { messageCount: 0, consumerCount: 0 };
 	if (status.connected) {

@@ -15,18 +15,13 @@
 			class="demo-tab"
 			class:active={activeDemo === tab.id}
 			onclick={() => onSelect(tab.id)}
-			title={tab.noCheck ?? entry.detail}
+			title={entry.detail}
 		>
 			{#if tab.statusUrl}
 				<StatusIcon
 					state={entry.state}
 					showWord
 				/>
-			{:else}
-				<span
-					class="no-check"
-					title={tab.noCheck}>In-app</span
-				>
 			{/if}
 			{tab.label}
 		</button>
@@ -68,11 +63,5 @@
 		color: var(--text);
 		background: rgba(255, 255, 255, 0.08);
 		border-color: var(--border-hover);
-	}
-
-	.no-check {
-		font-size: 0.7rem;
-		font-weight: 600;
-		color: var(--muted-fg);
 	}
 </style>

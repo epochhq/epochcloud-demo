@@ -1,13 +1,11 @@
 import type { RequestHandler } from './$types';
 import { config } from '#lib/server/config.js';
-import { guard, unavailable } from '#lib/server/guard.js';
+import { unavailable } from '#lib/server/respond.js';
 import { json, upstream } from '#lib/server/http.js';
 
 const NAME = /^[A-Za-z0-9._-]{1,64}$/;
 
-export const GET: RequestHandler = async ({ request, url }) => {
-	const auth = await guard(request);
-	if ('refusal' in auth) return auth.refusal;
+export const GET: RequestHandler = async ({ url }) => {
 	const flagName = url.searchParams.get('flag') ?? '';
 	if (!NAME.test(flagName)) return json({ success: false, error: "'flag' is 1 to 64 letters, digits, dot, dash or underscore" }, 400);
 	if (!config.gofeatureflag.enabled) return unavailable('GO Feature Flag');

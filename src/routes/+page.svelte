@@ -21,7 +21,6 @@
 	import DefectDojoDemo from './components/demos/DefectDojoDemo.svelte';
 	import PrometheusDemo from './components/demos/PrometheusDemo.svelte';
 	import LinkerdDemo from './components/demos/LinkerdDemo.svelte';
-	import ChaosDemo from './components/demos/ChaosDemo.svelte';
 	import FeatureFlagsDemo from './components/demos/FeatureFlagsDemo.svelte';
 	import NtfyDemo from './components/demos/NtfyDemo.svelte';
 	import KnativeDemo from './components/demos/KnativeDemo.svelte';
@@ -71,6 +70,7 @@
 			<h2 class="section-title">Live Demos</h2>
 			<span class="count-badge">{DEMOS.length}</span>
 		</div>
+		<p class="section-note">The in-app chaos demo is being replaced by a real LitmusChaos experiment.</p>
 
 		<DemoTabs
 			{activeDemo}
@@ -101,8 +101,6 @@
 			<PrometheusDemo />
 		{:else if activeDemo === 'linkerd'}
 			<LinkerdDemo />
-		{:else if activeDemo === 'chaos'}
-			<ChaosDemo />
 		{:else if activeDemo === 'featureflags'}
 			<FeatureFlagsDemo enabled={data.features.gofeatureflag} />
 		{:else if activeDemo === 'ntfy'}

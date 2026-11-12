@@ -41,3 +41,10 @@ it('shows a good but slow answer as slow, a fast one as ok', async () => {
 	const fast = await runCheck('/x', { now: () => (clock += 10), fetcher: fetcher(() => jsonResponse({ connected: true })) });
 	expect(fast.state).toBe('ok');
 });
+
+it('shows a check that did not run as not running, with its reason, neither ok nor failed', async () => {
+	const result = await runCheck('/x', {
+		fetcher: fetcher(() => jsonResponse({ connected: false, state: 'not-running', reason: 'Unavailable: needs a platform key' }))
+	});
+	expect(result).toMatchObject({ state: 'notrunning', detail: 'Unavailable: needs a platform key' });
+});

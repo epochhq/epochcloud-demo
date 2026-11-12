@@ -2,7 +2,8 @@ import pg from 'pg';
 import { config } from './config.js';
 import { log } from './logger.js';
 import { cnpgConnected, cnpgOperations, cnpgErrors } from './metrics.js';
-import { UPSTREAM_TIMEOUT_MS } from '../limits.js';
+import { DB_DEADLINE_MS, UPSTREAM_TIMEOUT_MS } from '../limits.js';
+import { withDeadline } from './http.js';
 
 const { Pool } = pg;
 
@@ -72,7 +73,7 @@ export async function initCnpg(): Promise<void> {
 		// keep client-side reasonable).
 		max: 5,
 		idleTimeoutMillis: 30_000,
-		connectionTimeoutMillis: 5_000,
+		connectionTimeoutMillis: UPSTREAM_TIMEOUT_MS,
 		// A query that outlives this ends with an error instead of holding the
 		// request open past the server's idle timeout.
 		query_timeout: UPSTREAM_TIMEOUT_MS
@@ -123,7 +124,7 @@ async function ensureSchemaIfNeeded(): Promise<void> {
 	await tryConnectAndEnsureSchema();
 }
 
-export async function listItems(): Promise<CnpgItem[]> {
+async function listItemsUnbounded(): Promise<CnpgItem[]> {
 	if (!pool) throw new Error('CNPG not connected');
 	await ensureSchemaIfNeeded();
 	cnpgOperations.inc({ op: 'list' });
@@ -131,7 +132,7 @@ export async function listItems(): Promise<CnpgItem[]> {
 	return r.rows;
 }
 
-export async function createItem(text: string): Promise<CnpgItem> {
+async function createItemUnbounded(text: string): Promise<CnpgItem> {
 	if (!pool) throw new Error('CNPG not connected');
 	await ensureSchemaIfNeeded();
 	cnpgOperations.inc({ op: 'create' });
@@ -144,7 +145,7 @@ export async function createItem(text: string): Promise<CnpgItem> {
 	return row;
 }
 
-export async function deleteItem(id: number): Promise<boolean> {
+async function deleteItemUnbounded(id: number): Promise<boolean> {
 	if (!pool) throw new Error('CNPG not connected');
 	await ensureSchemaIfNeeded();
 	cnpgOperations.inc({ op: 'delete' });
@@ -155,7 +156,7 @@ export async function deleteItem(id: number): Promise<boolean> {
 // A status that proves the database answers now: a query against the demo
 // table, which also proves the schema is in place. It never reads module
 // state, so a database that went away after startup reports as down.
-export async function getCnpgStatus(): Promise<{ items: number }> {
+async function getCnpgStatusUnbounded(): Promise<{ items: number }> {
 	if (!pool) throw new Error('CNPG not configured');
 	await ensureSchemaIfNeeded();
 	const r = await pool.query<{ items: number }>('SELECT count(*)::int AS items FROM demo_items');
@@ -166,3 +167,10 @@ export async function getCnpgStatus(): Promise<{ items: number }> {
 export async function closeCnpg(): Promise<void> {
 	await pool?.end().catch(() => {});
 }
+
+// The whole database part of one request, connecting and the schema re-check
+// included, ends within DB_DEADLINE_MS.
+export const listItems = (): Promise<CnpgItem[]> => withDeadline(listItemsUnbounded(), DB_DEADLINE_MS, 'the database');
+export const createItem = (text: string): Promise<CnpgItem> => withDeadline(createItemUnbounded(text), DB_DEADLINE_MS, 'the database');
+export const deleteItem = (id: number): Promise<boolean> => withDeadline(deleteItemUnbounded(id), DB_DEADLINE_MS, 'the database');
+export const getCnpgStatus = (): Promise<{ items: number }> => withDeadline(getCnpgStatusUnbounded(), DB_DEADLINE_MS, 'the database');

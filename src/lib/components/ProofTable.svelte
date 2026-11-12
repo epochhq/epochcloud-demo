@@ -18,6 +18,15 @@
 
 	const { board } = getPage();
 	const entry = $derived(board.get('prometheus'));
+
+	// The snapshot's age grows while the page is open: its age when it arrived
+	// plus the time since.
+	let now = $state(Date.now());
+	$effect(() => {
+		const id = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(id);
+	});
+	const age = $derived(Math.round(Number(entry.data?.age_seconds ?? 0) + Math.max(0, now - entry.at) / 1000));
 	const proofs = $derived(((entry.data?.proofs as Proof[] | undefined) ?? []).filter((proof) => proof.group === group));
 	const format = (value: number | null, unit: string) =>
 		value === null || Number.isNaN(value)
@@ -39,10 +48,10 @@
 			{#each proofs as proof (proof.id)}
 				<tr>
 					<td class="state"
-						><StatusIcon
-							state={proof.state === 'ok' ? 'ok' : proof.state === 'failed' ? 'failed' : 'unchecked'}
-							showWord
-						/></td
+						>{#if proof.state === 'info'}<span class="info">Reading</span>{:else}<StatusIcon
+								state={proof.state}
+								showWord
+							/>{/if}</td
 					>
 					<td>{proof.title}</td>
 					<td class="value">{format(proof.value, proof.unit)}</td>
@@ -57,7 +66,7 @@
 			{/each}
 		</tbody>
 	</table>
-	<p class="card-desc">Server snapshot, {entry.data?.age_seconds ?? 0}s old. Series are limited to this namespace.</p>
+	<p class="card-desc">Server snapshot, {age}s old. Series are limited to this namespace.</p>
 {/if}
 
 <style>
@@ -75,6 +84,12 @@
 	.value {
 		text-align: right;
 		font-family: 'JetBrains Mono', monospace;
+	}
+
+	.info {
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: var(--muted-fg);
 	}
 
 	.series td {

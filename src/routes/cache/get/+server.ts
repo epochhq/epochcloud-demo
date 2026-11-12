@@ -1,13 +1,10 @@
 import type { RequestHandler } from './$types';
-import { guard } from '#lib/server/guard.js';
 import { json } from '#lib/server/http.js';
 import { valkeyGet } from '#lib/server/valkey.js';
 
 const KEY = /^[A-Za-z0-9_-]{1,64}$/;
 
-export const GET: RequestHandler = async ({ request, url }) => {
-	const auth = await guard(request);
-	if ('refusal' in auth) return auth.refusal;
+export const GET: RequestHandler = async ({ url }) => {
 	const key = url.searchParams.get('key') || 'demo-key';
 	if (!KEY.test(key)) return json({ success: false, error: 'key: letters, digits, dash and underscore, at most 64' }, 400);
 	try {

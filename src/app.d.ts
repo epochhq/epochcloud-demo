@@ -3,7 +3,10 @@
 declare global {
 	namespace App {
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			/** The verified sign-in behind the request; set by the access check for every route that is not anonymous. */
+			session?: import('./lib/server/session.js').Session;
+		}
 		// interface PageData {}
 		// interface PageState {}
 		// interface Platform {}

@@ -426,3 +426,9 @@ select.input {
 		grid-template-columns: 1fr;
 	}
 }
+
+.section-note {
+	margin: 0 0 0.75rem;
+	font-size: 0.8rem;
+	color: var(--muted-fg);
+}

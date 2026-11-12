@@ -1,18 +1,19 @@
 import { CLIENT_TIMEOUT_MS, SLOW_AFTER_MS } from './limits.js';
 
 /** What a check can show: not run, running, answered, answered slowly or timed out, or failed. */
-export type CheckState = 'unchecked' | 'checking' | 'ok' | 'slow' | 'failed';
+export type CheckState = 'unchecked' | 'checking' | 'notrunning' | 'ok' | 'slow' | 'failed';
 
 export const WORDS: Record<CheckState, string> = {
 	unchecked: 'Not checked',
 	checking: 'Checking',
+	notrunning: 'Not running',
 	ok: 'OK',
 	slow: 'Slow',
 	failed: 'Failed'
 };
 
 export interface CheckResult {
-	state: 'ok' | 'slow' | 'failed';
+	state: 'ok' | 'slow' | 'failed' | 'notrunning';
 	detail: string;
 	ms: number;
 	status: number;
@@ -64,6 +65,11 @@ export async function runCheck(url: string, options: CheckOptions = {}): Promise
 	}
 	const ms = elapsed();
 
+	// A check that did not run (unavailable by design, not configured, no traffic
+	// yet) says so; it is neither ok nor failed.
+	if (data.state === 'not-running') {
+		return { state: 'notrunning', detail: typeof data.reason === 'string' ? data.reason : 'Not running', ms, status: resp.status, data };
+	}
 	if (!resp.ok || data.connected === false || data.success === false) {
 		if (data.timeout === true) return { state: 'slow', detail: 'The upstream timed out', ms, status: resp.status, data };
 		const reason = typeof data.error === 'string' ? data.error : typeof data.message === 'string' ? data.message : `HTTP ${resp.status}`;

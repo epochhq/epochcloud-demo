@@ -2,7 +2,8 @@ import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from './config.js';
 import { log } from './logger.js';
 import { emailsSentTotal, emailErrors } from './metrics.js';
-import { UPSTREAM_TIMEOUT_MS } from '../limits.js';
+import { MAIL_DEADLINE_MS, UPSTREAM_TIMEOUT_MS } from '../limits.js';
+import { withDeadline } from './http.js';
 
 let transporter: Transporter | null = null;
 
@@ -53,12 +54,16 @@ Pipeline: SvelteKit App → Maddy (SMTP relay) → Resend API → DKIM-signed de
 EpochCloud - Self-hosted Kubernetes platform`;
 
 	try {
-		await transporter.sendMail({
-			from: config.smtp.from,
-			to,
-			subject: 'Hello from EpochCloud SvelteKit!',
-			text: body
-		});
+		await withDeadline(
+			transporter.sendMail({
+				from: config.smtp.from,
+				to,
+				subject: 'Hello from EpochCloud SvelteKit!',
+				text: body
+			}),
+			MAIL_DEADLINE_MS,
+			'the mail relay'
+		);
 		emailsSentTotal.inc();
 		log('info', 'Email sent');
 	} catch (err) {

@@ -8,12 +8,17 @@
 	// The check row every integration panel shows: a button, the state as icon
 	// plus word, and what the check found. Running it also updates the tab pill,
 	// because both read the same entry on the board.
-	let { id }: { id: string } = $props();
+	let { id, alsoRefresh }: { id: string; alsoRefresh?: string } = $props();
 
 	const { board } = getPage();
 	const entry = $derived(board.get(id));
 	const tab = $derived(demo(id));
-	const run = () => (tab.statusUrl ? board.run(id, tab.statusUrl, { describe: tab.describe }) : Promise.resolve());
+	const run = async () => {
+		if (tab.statusUrl) await board.run(id, tab.statusUrl, { describe: tab.describe });
+		// A tab that shows another tab's table refreshes that table too.
+		const other = alsoRefresh ? demo(alsoRefresh) : null;
+		if (other?.statusUrl) await board.run(other.id, other.statusUrl, { describe: other.describe });
+	};
 
 	onMount(() => {
 		if (entry.state === 'unchecked') void run();

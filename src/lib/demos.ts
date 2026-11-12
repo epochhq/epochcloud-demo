@@ -1,12 +1,10 @@
 // The live demos, in tab order. A tab with a statusUrl is checked when the
-// page loads and again whenever its panel's own check runs. A tab without one
-// says why: Chaos has no dependency to check.
+// page loads and again whenever its panel's own check runs.
 export interface DemoTab {
 	id: string;
 	label: string;
 	statusUrl?: string;
 	describe?: (data: Record<string, unknown>) => string;
-	noCheck?: string;
 }
 
 const n = (value: unknown) => Number(value ?? 0);
@@ -29,10 +27,12 @@ export const DEMOS: DemoTab[] = [
 		id: 'prometheus',
 		label: 'Prometheus',
 		statusUrl: '/status/proofs',
-		describe: (d) => `${(d.proofs as unknown[] | undefined)?.length ?? 0} queries answered`
+		describe: (d) => {
+			const proofs = (d.proofs as Array<{ value: number | null }> | undefined) ?? [];
+			return `${proofs.filter((proof) => proof.value !== null).length} of ${proofs.length} queries answered`;
+		}
 	},
 	{ id: 'linkerd', label: 'Linkerd', statusUrl: '/status/linkerd', describe: (d) => `${n(d.mtls_requests_10m)} mTLS requests from Traefik in 10 minutes` },
-	{ id: 'chaos', label: 'Chaos Testing', noCheck: 'In-app fault injection: it has no dependency to check' },
 	{ id: 'featureflags', label: 'Feature Flags', statusUrl: '/status/featureflags', describe: (d) => `${n(d.flags_available)} flags` },
 	{ id: 'ntfy', label: 'ntfy', statusUrl: '/status/ntfy', describe: () => 'Server reports healthy' },
 	{ id: 'knative', label: 'Knative', statusUrl: '/status/knative', describe: (d) => `Invocation answered in ${n(d.latency_ms)} ms` }

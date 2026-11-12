@@ -1,11 +1,9 @@
 import type { RequestHandler } from './$types';
 import { config } from '#lib/server/config.js';
-import { guard, unavailable } from '#lib/server/guard.js';
+import { unavailable } from '#lib/server/respond.js';
 import { json, upstream } from '#lib/server/http.js';
 
-export const GET: RequestHandler = async ({ request, url }) => {
-	const auth = await guard(request);
-	if ('refusal' in auth) return auth.refusal;
+export const GET: RequestHandler = async ({ url }) => {
 	if (!config.gofeatureflag.enabled) return unavailable('GO Feature Flag');
 	try {
 		const resp = await upstream(`${config.gofeatureflag.url}/v1/allflags`, {
