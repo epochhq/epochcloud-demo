@@ -2,7 +2,12 @@ import { beforeEach, expect, it, vi } from 'vite-plus/test';
 
 vi.mock('$app/env/private', () => ({ PROMETHEUS_URL: 'http://prom.test' }));
 vi.mock('#lib/server/config.js', () => ({ config: { podNamespace: 'epochcloud-demo-dev' } }));
-for (const module of ['rabbitmq', 'valkey', 'cnpg', 'smtp', 'knative', 'defectdojo']) vi.mock(`#lib/server/${module}.js`, () => ({}));
+vi.mock('#lib/server/rabbitmq.js', () => ({}));
+vi.mock('#lib/server/valkey.js', () => ({}));
+vi.mock('#lib/server/cnpg.js', () => ({}));
+vi.mock('#lib/server/smtp.js', () => ({}));
+vi.mock('#lib/server/knative.js', () => ({}));
+vi.mock('#lib/server/defectdojo.js', () => ({}));
 
 import '../../src/lib/server/checks.js';
 import { refresh, snapshotResponse } from '../../src/lib/server/snapshot.js';

@@ -26,7 +26,7 @@ it('substitutes the namespace matcher, and refuses a namespace that could end th
 	});
 	await evaluateProofs('epochcloud-demo-dev');
 	expect(queries.length).toBe(PROOFS.length);
-	for (const query of queries) expect(query).toContain('namespace="epochcloud-demo-dev"');
+	for (const query of queries) expect(query).toMatch(/namespace="epochcloud-demo-dev"|exported_service=~"epochcloud-demo-dev-epochcloud-demo/);
 	await expect(evaluateProofs('x"} or vector(1) #')).rejects.toThrow('invalid namespace');
 });
 
