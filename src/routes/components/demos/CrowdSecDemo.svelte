@@ -12,8 +12,8 @@
 	<StatusRow id="crowdsec" />
 	{#if enabled}
 		<p class="card-desc">
-			The check asks the CrowdSec LAPI for decisions with the bouncer key, so it passes only while the LAPI is up and accepts the key. Per-address lookups stay
-			with the CrowdSec dashboard behind its login.
+			The check asks the CrowdSec LAPI for decisions with a per-app read-only key, so it passes only while the LAPI is up and accepts the key. The platform
+			issues no per-app key yet, so the check reports unavailable. Per-address lookups stay with the CrowdSec dashboard behind its login.
 		</p>
 	{:else}
 		<p class="disabled-msg">Not configured - CROWDSEC_LAPI_URL not set</p>

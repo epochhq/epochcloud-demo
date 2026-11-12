@@ -39,7 +39,7 @@ defineChecks([
 	{
 		name: 'crowdsec',
 		enabled: () => config.crowdsec.enabled && !!config.crowdsec.bouncerKey,
-		missing: 'CrowdSec not configured',
+		missing: 'Unavailable: needs a per-app read-only key from the platform',
 		// A decisions lookup with the bouncer key succeeds only when the LAPI is up
 		// and accepts the key, which /health does not prove.
 		run: async () => {
