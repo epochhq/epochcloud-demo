@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
+	import { DEMOS } from '#lib/demos.js';
+	import { AccountState, StatusBoard, setPage } from '#lib/status.svelte.js';
 	import Header from './components/Header.svelte';
 	import BuildBar from './components/BuildBar.svelte';
 	import PlatformStack from './components/PlatformStack.svelte';
@@ -18,7 +21,6 @@
 	import DefectDojoDemo from './components/demos/DefectDojoDemo.svelte';
 	import PrometheusDemo from './components/demos/PrometheusDemo.svelte';
 	import LinkerdDemo from './components/demos/LinkerdDemo.svelte';
-	import ChaosDemo from './components/demos/ChaosDemo.svelte';
 	import FeatureFlagsDemo from './components/demos/FeatureFlagsDemo.svelte';
 	import NtfyDemo from './components/demos/NtfyDemo.svelte';
 	import KnativeDemo from './components/demos/KnativeDemo.svelte';
@@ -26,32 +28,17 @@
 	let { data }: { data: PageData } = $props();
 
 	let activeDemo = $state('rabbitmq');
-	let statuses: Record<string, { ok: boolean; checked: boolean }> = $state({});
+	const board = new StatusBoard();
+	const account = new AccountState();
+	setPage({ board, account });
 
-	// Lightweight parallel status check on mount for tab dot indicators
-	$effect(() => {
-		const checks = [
-			{ key: 'rabbitmq', url: '/rabbitmq/status' },
-			{ key: 'valkey', url: '/cache/status' },
-			{ key: 'cnpg', url: '/cnpg/status' },
-			{ key: 'betterauth', url: '/auth/status' },
-			{ key: 'crowdsec', url: '/crowdsec/status' },
-			{ key: 'defectdojo', url: '/defectdojo/status' },
-			{ key: 'featureflags', url: '/features/status' },
-			{ key: 'ntfy', url: '/ntfy/status' }
-		];
-
-		Promise.allSettled(
-			checks.map(async ({ key, url }) => {
-				try {
-					const resp = await fetch(url);
-					const d = await resp.json();
-					statuses[key] = { ok: d.connected, checked: true };
-				} catch {
-					statuses[key] = { ok: false, checked: true };
-				}
-			})
-		);
+	// Every tab with a check is checked once when the page opens; the panels
+	// reuse the result instead of repeating the call.
+	onMount(() => {
+		void account.refresh();
+		for (const tab of DEMOS) {
+			if (tab.statusUrl) void board.run(tab.id, tab.statusUrl, { describe: tab.describe });
+		}
 	});
 </script>
 
@@ -81,12 +68,12 @@
 	<section class="section">
 		<div class="section-head">
 			<h2 class="section-title">Live Demos</h2>
-			<span class="count-badge">13</span>
+			<span class="count-badge">{DEMOS.length}</span>
 		</div>
+		<p class="section-note">The in-app chaos demo is being replaced by a real LitmusChaos experiment.</p>
 
 		<DemoTabs
 			{activeDemo}
-			{statuses}
 			onSelect={(id) => (activeDemo = id)}
 		/>
 
@@ -114,12 +101,13 @@
 			<PrometheusDemo />
 		{:else if activeDemo === 'linkerd'}
 			<LinkerdDemo />
-		{:else if activeDemo === 'chaos'}
-			<ChaosDemo />
 		{:else if activeDemo === 'featureflags'}
 			<FeatureFlagsDemo enabled={data.features.gofeatureflag} />
 		{:else if activeDemo === 'ntfy'}
-			<NtfyDemo enabled={data.features.ntfy} />
+			<NtfyDemo
+				enabled={data.features.ntfy}
+				domain={data.domain}
+			/>
 		{:else if activeDemo === 'knative'}
 			<KnativeDemo enabled={data.features.knative} />
 		{/if}

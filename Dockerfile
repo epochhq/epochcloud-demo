@@ -11,6 +11,9 @@ USER root
 # The build reads git metadata without a per-commit dependency-layer cache key.
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 COPY . .
+# Lint, type check and tests run in the build, so an image on either lane cannot
+# exist for a tree that fails them. A client hook is not a gate.
+RUN bun run lint && bun run typecheck && bun run check:svelte && bun run test
 RUN node -e 'if (process.versions.node !== require("./package.json").engines.node) throw new Error("Node tooling version differs from package.json")' && bun run build
 
 FROM oven/bun:1.4.4-alpine@sha256:4cf82f5686b196504fe119db3fcd9185b191f82ece82c40680e597228ec6070a AS production-dependencies

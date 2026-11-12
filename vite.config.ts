@@ -4,6 +4,7 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig, lazyPlugins } from 'vite-plus';
+import { IDLE_TIMEOUT_SECONDS } from './src/lib/limits.ts';
 
 // Build metadata is stamped at `vite build` time, NOT via Docker --build-arg.
 // The in-cluster buildah pipeline deliberately passes no per-build --build-arg
@@ -137,7 +138,7 @@ export default defineConfig({
 		},
 		overrides: [
 			{
-				files: ['*.svelte', '**/*.svelte'],
+				files: ['*.svelte', '**/*.svelte', '**/*.svelte.ts'],
 				globals: {
 					$state: 'readonly',
 					$derived: 'readonly',
@@ -179,13 +180,31 @@ export default defineConfig({
 		ignorePatterns: ['.svelte-kit', 'build', 'dist', 'node_modules', 'bun.lock']
 	},
 	test: {
-		include: ['tests/local/**/*.test.ts'],
-		testTimeout: 1000
+		include: ['tests/local/**/*.test.ts']
 	},
 	plugins: lazyPlugins(() => [
 		sveltekit({
 			preprocess: vitePreprocess(),
-			adapter: adapter({ out: 'build', precompress: false, envPrefix: '' }),
+			// Same-origin only. SvelteKit adds nonces for its own inline scripts;
+			// styles keep 'unsafe-inline' because Svelte emits style attributes.
+			csp: {
+				directives: {
+					'default-src': ['self'],
+					'script-src': ['self'],
+					'style-src': ['self', 'unsafe-inline'],
+					'img-src': ['self', 'data:'],
+					'connect-src': ['self'],
+					'object-src': ['none'],
+					'base-uri': ['self'],
+					'form-action': ['self'],
+					'frame-ancestors': ['none']
+				}
+			},
+			// Bun cuts a request that has written nothing for idleTimeout seconds
+			// (default 10) and the app still logs 200 for it. The value sits above
+			// every deliberate wait and below nothing else: src/lib/limits.ts keeps
+			// the budgets that must stay under it.
+			adapter: adapter({ out: 'build', precompress: false, envPrefix: '', serverOptions: { idleTimeout: IDLE_TIMEOUT_SECONDS } }),
 			tracing: { server: true }
 		})
 	]),

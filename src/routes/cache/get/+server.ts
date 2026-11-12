@@ -1,28 +1,16 @@
 import type { RequestHandler } from './$types';
+import { json } from '#lib/server/http.js';
 import { valkeyGet } from '#lib/server/valkey.js';
+
+const KEY = /^[A-Za-z0-9_-]{1,64}$/;
 
 export const GET: RequestHandler = async ({ url }) => {
 	const key = url.searchParams.get('key') || 'demo-key';
-
+	if (!KEY.test(key)) return json({ success: false, error: 'key: letters, digits, dash and underscore, at most 64' }, 400);
 	try {
-		const value = await valkeyGet(key);
-		return new Response(
-			JSON.stringify({
-				key,
-				value,
-				cache_hit: value !== null,
-				timestamp: new Date().toISOString()
-			}),
-			{ headers: { 'Content-Type': 'application/json' } }
-		);
-	} catch (err) {
-		return new Response(
-			JSON.stringify({
-				success: false,
-				error: String(err),
-				timestamp: new Date().toISOString()
-			}),
-			{ status: 500, headers: { 'Content-Type': 'application/json' } }
-		);
+		const value = await valkeyGet(`demo:${key}`);
+		return json({ key, value, cache_hit: value !== null });
+	} catch {
+		return json({ success: false, error: 'the cache did not answer' }, 502);
 	}
 };

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import StatusIcon from '#lib/components/StatusIcon.svelte';
+	import SignInGate from '#lib/components/SignInGate.svelte';
+	import { act } from '#lib/check.js';
+	import StatusRow from '#lib/components/StatusRow.svelte';
 
 	let { enabled }: { enabled: boolean } = $props();
 
-	let statusText = $state('Not checked');
-	let statusOk = $state(false);
 	let flagName = $state('maintenance-mode');
 	let userId = $state('user-123');
 
@@ -22,54 +22,23 @@
 	let allUser = $state('user-456');
 	let error = $state('');
 
-	async function checkStatus() {
-		statusText = 'Checking...';
-		try {
-			const resp = await fetch('/features/status');
-			const d = await resp.json();
-			statusOk = d.connected;
-			statusText = d.connected ? `Connected - ${d.flags_available || 0} flags` : `Disconnected${d.error ? ' - ' + d.error : ''}`;
-		} catch (err) {
-			statusText = `Error: ${err}`;
-			statusOk = false;
-		}
-	}
-
 	async function evaluate() {
 		error = '';
 		evalResult = null;
-		try {
-			const resp = await fetch(`/features/evaluate?flag=${encodeURIComponent(flagName)}&user=${encodeURIComponent(userId)}`);
-			const d = await resp.json();
-			if (d.error) {
-				error = d.error;
-			} else {
-				evalResult = d;
-			}
-		} catch (err) {
-			error = `Error: ${err}`;
-		}
+		const r = await act(`/features/evaluate?flag=${encodeURIComponent(flagName)}&user=${encodeURIComponent(userId)}`);
+		if (!r.ok) error = r.detail;
+		else if (r.data!.error) error = String(r.data!.error);
+		else evalResult = r.data as unknown as FfEvalResult;
 	}
 
 	async function evalAll() {
 		error = '';
 		allFlags = null;
-		try {
-			const resp = await fetch(`/features/all?user=${encodeURIComponent(allUser)}`);
-			const d = await resp.json();
-			if (d.error) {
-				error = d.error;
-			} else {
-				allFlags = d;
-			}
-		} catch (err) {
-			error = `Error: ${err}`;
-		}
+		const r = await act(`/features/all?user=${encodeURIComponent(allUser)}`);
+		if (!r.ok) error = r.detail;
+		else if (r.data!.error) error = String(r.data!.error);
+		else allFlags = r.data!.flags as NonNullable<typeof allFlags>;
 	}
-
-	$effect(() => {
-		checkStatus();
-	});
 </script>
 
 <div class="card">
@@ -77,125 +46,117 @@
 		<h3>Feature Flags</h3>
 		<span class="card-tag">GO Feature Flag</span>
 	</div>
-	<div class="status-row">
-		<button
-			onclick={checkStatus}
-			class="btn btn-outline btn-sm">Check Status</button
-		>
-		<StatusIcon
-			ok={statusOk}
-			checked={statusText !== 'Not checked'}
-		/>
-		<span class="status-text">{statusText}</span>
-	</div>
+	<StatusRow id="featureflags" />
 	{#if enabled}
-		<div class="ff-sections">
-			<div class="ff-section">
-				<span class="form-label">Evaluate Flag</span>
-				<select
-					bind:value={flagName}
-					class="input"
-				>
-					<option value="maintenance-mode">maintenance-mode</option>
-					<option value="new-dashboard-layout">new-dashboard-layout</option>
-					<option value="dark-mode">dark-mode</option>
-					<option value="welcome-banner">welcome-banner</option>
-				</select>
-				<div class="ff-user-row">
-					<input
-						type="text"
-						bind:value={userId}
-						placeholder="User ID"
+		<SignInGate>
+			<div class="ff-sections">
+				<div class="ff-section">
+					<span class="form-label">Evaluate Flag</span>
+					<select
+						bind:value={flagName}
 						class="input"
-					/>
-					<div class="ff-user-presets">
-						{#each ['user-123', 'admin', 'beta-tester', 'anonymous'] as preset (preset)}
-							<button
-								class="ff-preset"
-								class:active={userId === preset}
-								onclick={() => (userId = preset)}>{preset}</button
-							>
-						{/each}
-					</div>
-				</div>
-				<button
-					onclick={evaluate}
-					class="btn btn-primary btn-sm w-full">Evaluate</button
-				>
-				{#if evalResult}
-					<div class="ff-result-card">
-						<div class="ff-result-header">
-							<span class="ff-flag-name">{evalResult.flag}</span>
-							<span
-								class="ff-value-badge"
-								class:on={evalResult.value === true}
-								class:off={evalResult.value === false}
-							>
-								{#if typeof evalResult.value === 'boolean'}
-									{evalResult.value ? 'ON' : 'OFF'}
-								{:else}
-									{JSON.stringify(evalResult.value)}
-								{/if}
-							</span>
+					>
+						<option value="maintenance-mode">maintenance-mode</option>
+						<option value="new-dashboard-layout">new-dashboard-layout</option>
+						<option value="dark-mode">dark-mode</option>
+						<option value="welcome-banner">welcome-banner</option>
+					</select>
+					<div class="ff-user-row">
+						<input
+							type="text"
+							bind:value={userId}
+							placeholder="User ID"
+							class="input"
+						/>
+						<div class="ff-user-presets">
+							{#each ['user-123', 'admin', 'beta-tester', 'anonymous'] as preset (preset)}
+								<button
+									class="ff-preset"
+									class:active={userId === preset}
+									onclick={() => (userId = preset)}>{preset}</button
+								>
+							{/each}
 						</div>
-						{#if evalResult.variationType}
-							<div class="ff-result-meta">
-								<span>Variation: <strong>{evalResult.variationType}</strong></span>
-								{#if evalResult.reason}<span>Reason: {evalResult.reason}</span>{/if}
-							</div>
-						{/if}
 					</div>
-				{/if}
-			</div>
-
-			<div class="ff-section">
-				<span class="form-label">All Flags</span>
-				<div class="ff-user-row">
-					<input
-						type="text"
-						bind:value={allUser}
-						placeholder="User ID"
-						class="input"
-					/>
-					<div class="ff-user-presets">
-						{#each ['user-456', 'admin', 'new-user'] as preset (preset)}
-							<button
-								class="ff-preset"
-								class:active={allUser === preset}
-								onclick={() => (allUser = preset)}>{preset}</button
-							>
-						{/each}
-					</div>
-				</div>
-				<button
-					onclick={evalAll}
-					class="btn btn-secondary btn-sm w-full">Evaluate All</button
-				>
-				{#if allFlags}
-					<div class="ff-flags-table">
-						{#each Object.entries(allFlags) as [name, flag] (name)}
-							<div class="ff-flag-row">
-								<span class="ff-flag-name">{name}</span>
+					<button
+						onclick={evaluate}
+						class="btn btn-primary btn-sm w-full">Evaluate</button
+					>
+					{#if evalResult}
+						<div class="ff-result-card">
+							<div class="ff-result-header">
+								<span class="ff-flag-name">{evalResult.flag}</span>
 								<span
 									class="ff-value-badge"
-									class:on={flag.value === true}
-									class:off={flag.value === false}
+									class:on={evalResult.value === true}
+									class:off={evalResult.value === false}
 								>
-									{#if typeof flag.value === 'boolean'}
-										{flag.value ? 'ON' : 'OFF'}
+									{#if typeof evalResult.value === 'boolean'}
+										{evalResult.value ? 'ON' : 'OFF'}
 									{:else}
-										{JSON.stringify(flag.value)}
+										{JSON.stringify(evalResult.value)}
 									{/if}
 								</span>
 							</div>
-						{/each}
+							{#if evalResult.variationType}
+								<div class="ff-result-meta">
+									<span>Variation: <strong>{evalResult.variationType}</strong></span>
+									{#if evalResult.reason}<span>Reason: {evalResult.reason}</span>{/if}
+								</div>
+							{/if}
+						</div>
+					{/if}
+				</div>
+
+				<div class="ff-section">
+					<span class="form-label">All Flags</span>
+					<div class="ff-user-row">
+						<input
+							type="text"
+							bind:value={allUser}
+							placeholder="User ID"
+							class="input"
+						/>
+						<div class="ff-user-presets">
+							{#each ['user-456', 'admin', 'new-user'] as preset (preset)}
+								<button
+									class="ff-preset"
+									class:active={allUser === preset}
+									onclick={() => (allUser = preset)}>{preset}</button
+								>
+							{/each}
+						</div>
 					</div>
-				{/if}
+					<button
+						onclick={evalAll}
+						class="btn btn-secondary btn-sm w-full">Evaluate All</button
+					>
+					{#if allFlags}
+						<div class="ff-flags-table">
+							{#each Object.entries(allFlags) as [name, flag] (name)}
+								<div class="ff-flag-row">
+									<span class="ff-flag-name">{name}</span>
+									<span
+										class="ff-value-badge"
+										class:on={flag.value === true}
+										class:off={flag.value === false}
+									>
+										{#if typeof flag.value === 'boolean'}
+											{flag.value ? 'ON' : 'OFF'}
+										{:else}
+											{JSON.stringify(flag.value)}
+										{/if}
+									</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
 			</div>
-		</div>
-		{#if error}
-			<pre class="result-pre err">{error}</pre>
-		{/if}
+			{#if error}
+				<pre class="result-pre err">{error}</pre>
+			{/if}
+		</SignInGate>
 	{:else}
 		<p class="disabled-msg">Not configured - GOFEATUREFLAG_URL not set</p>
 	{/if}

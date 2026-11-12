@@ -1,23 +1,24 @@
 <script lang="ts">
+	import SignInGate from '#lib/components/SignInGate.svelte';
+	import StatusRow from '#lib/components/StatusRow.svelte';
+	import { act, form } from '#lib/check.js';
+	import { getPage } from '#lib/status.svelte.js';
+
 	let { enabled }: { enabled: boolean } = $props();
 
-	let emailInput = $state('');
-	let emailStatus = $state('');
-	let emailError = $state(false);
+	const { account } = getPage();
 
+	let status = $state('');
+	let isError = $state(false);
+
+	// The server mails the signed-in user's own verified address; nothing is
+	// sent from this page but the request itself.
 	async function sendEmail() {
-		if (!emailInput) return;
-		emailStatus = 'Sending...';
-		emailError = false;
-		try {
-			const resp = await fetch(`/email/send?email=${encodeURIComponent(emailInput)}`);
-			const r = await resp.json();
-			emailStatus = r.success ? `Sent to ${emailInput}` : r.error;
-			emailError = !r.success;
-		} catch (err) {
-			emailStatus = String(err);
-			emailError = true;
-		}
+		status = 'Sending...';
+		isError = false;
+		const r = await act('/email/send', form());
+		status = r.ok ? String(r.data!.message) : r.detail;
+		isError = !r.ok;
 	}
 </script>
 
@@ -26,28 +27,24 @@
 		<h3>Email</h3>
 		<span class="card-tag">SMTP</span>
 	</div>
+	<StatusRow id="email" />
 	{#if enabled}
-		<div class="form-row">
-			<input
-				type="email"
-				bind:value={emailInput}
-				placeholder="recipient@example.com"
-				class="input"
-			/>
+		<SignInGate>
+			<p class="card-desc">The test mail goes to your own verified address, {account.session?.user.email}.</p>
 			<button
 				onclick={sendEmail}
-				class="btn btn-primary btn-sm">Send</button
+				class="btn btn-primary btn-sm">Send me a test email</button
 			>
-		</div>
-		{#if emailStatus}
-			<p
-				class="result"
-				class:ok={!emailError}
-				class:err={emailError}
-			>
-				{emailStatus}
-			</p>
-		{/if}
+			{#if status}
+				<p
+					class="result"
+					class:ok={!isError}
+					class:err={isError}
+				>
+					{status}
+				</p>
+			{/if}
+		</SignInGate>
 	{:else}
 		<p class="disabled-msg">Not configured - SMTP_HOST not set</p>
 	{/if}

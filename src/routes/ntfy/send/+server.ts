@@ -1,68 +1,31 @@
 import type { RequestHandler } from './$types';
 import { config } from '#lib/server/config.js';
-import { log } from '#lib/server/logger.js';
+import { unavailable } from '#lib/server/respond.js';
+import { json } from '#lib/server/http.js';
+import { topicFor, publish } from '#lib/server/ntfy.js';
+import { claimCooldown } from '#lib/server/valkey.js';
 
-export const POST: RequestHandler = async ({ request }) => {
-	if (!config.ntfy.enabled) {
-		return new Response(JSON.stringify({ success: false, error: 'ntfy not configured (NTFY_URL not set)' }), {
-			status: 503,
-			headers: { 'Content-Type': 'application/json' }
-		});
+const COOLDOWN_SECONDS = 30;
+
+// One fixed notification to the signed-in user's own topic. Neither the topic
+// nor the text comes from the request.
+export const POST: RequestHandler = async ({ locals }) => {
+	if (!config.ntfy.enabled) return unavailable('ntfy');
+	// Publishing needs a user that may write only this app's topics. The platform
+	// has no per-app ntfy user yet, and the platform admin user is never copied
+	// into the app, so without a credential the action says so and does nothing.
+	if (!config.ntfy.user || !config.ntfy.password) {
+		return json({ success: false, reason: 'unavailable', error: 'Unavailable: the platform offers apps no ntfy user restricted to their own topics yet' }, 503);
 	}
+	const topic = topicFor(locals.session!.user.id);
 
+	if (!(await claimCooldown(`ntfy:${locals.session!.user.id}`, COOLDOWN_SECONDS))) {
+		return json({ success: false, error: `one notification per ${COOLDOWN_SECONDS} seconds`, retry_after_seconds: COOLDOWN_SECONDS }, 429);
+	}
 	try {
-		const body = await request.json();
-		const rawTopic = String(body.topic || 'epochcloud-demo');
-		// Sanitize topic: alphanumeric, hyphens, underscores only - no path traversal
-		const topic = rawTopic.replace(/[^a-zA-Z0-9_-]/g, '');
-		if (!topic) {
-			return new Response(JSON.stringify({ success: false, error: 'Invalid topic name' }), {
-				status: 400,
-				headers: { 'Content-Type': 'application/json' }
-			});
-		}
-		const message = body.message || `Hello from SvelteKit (${config.hostname})`;
-		const title = body.title || 'EpochCloud Demo';
-		const priority = body.priority || '3';
-
-		const resp = await fetch(`${config.ntfy.url}/${topic}`, {
-			method: 'POST',
-			headers: {
-				Title: title,
-				Priority: priority,
-				Tags: 'rocket',
-				...(config.ntfy.user && config.ntfy.password
-					? {
-							Authorization: `Basic ${Buffer.from(`${config.ntfy.user}:${config.ntfy.password}`).toString('base64')}`
-						}
-					: {})
-			},
-			body: message
-		});
-
-		if (resp.ok) {
-			log('info', 'ntfy notification sent', { topic, message });
-			return new Response(
-				JSON.stringify({
-					success: true,
-					topic,
-					message,
-					timestamp: new Date().toISOString()
-				}),
-				{ headers: { 'Content-Type': 'application/json' } }
-			);
-		} else {
-			const errText = await resp.text();
-			return new Response(JSON.stringify({ success: false, error: `ntfy error: ${resp.status} ${errText}` }), {
-				status: 500,
-				headers: { 'Content-Type': 'application/json' }
-			});
-		}
-	} catch (err) {
-		log('error', 'ntfy send error', { error: String(err) });
-		return new Response(JSON.stringify({ success: false, error: String(err) }), {
-			status: 500,
-			headers: { 'Content-Type': 'application/json' }
-		});
+		await publish(topic, 'EpochCloud demo', 'This notification came from the EpochCloud demo.');
+		return json({ success: true, topic });
+	} catch {
+		return json({ success: false, error: 'ntfy did not accept the message' }, 502);
 	}
 };

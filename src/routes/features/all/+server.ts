@@ -1,36 +1,19 @@
 import type { RequestHandler } from './$types';
 import { config } from '#lib/server/config.js';
+import { unavailable } from '#lib/server/respond.js';
+import { json, upstream } from '#lib/server/http.js';
 
 export const GET: RequestHandler = async ({ url }) => {
-	const timestamp = new Date().toISOString();
-	const userId = url.searchParams.get('user') || 'anonymous';
-
-	if (!config.gofeatureflag.enabled) {
-		return Response.json({
-			error: 'GO Feature Flag not configured',
-			timestamp
-		});
-	}
-
+	if (!config.gofeatureflag.enabled) return unavailable('GO Feature Flag');
 	try {
-		const resp = await fetch(`${config.gofeatureflag.url}/v1/allflags`, {
+		const resp = await upstream(`${config.gofeatureflag.url}/v1/allflags`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				evaluationContext: {
-					targetingKey: userId,
-					environment: config.environment
-				}
-			}),
-			signal: AbortSignal.timeout(5000)
+			body: JSON.stringify({ evaluationContext: { targetingKey: (url.searchParams.get('user') || 'anonymous').slice(0, 64), environment: config.environment } })
 		});
-
-		const allFlags = await resp.json();
-		return Response.json(allFlags);
-	} catch (err) {
-		return Response.json({
-			error: `Relay proxy request failed: ${String(err)}`,
-			timestamp
-		});
+		const body = (await resp.json()) as { flags?: object };
+		return json({ success: resp.ok, flags: body.flags ?? body }, resp.ok ? 200 : 502);
+	} catch {
+		return json({ success: false, error: 'the relay proxy did not answer' }, 502);
 	}
 };

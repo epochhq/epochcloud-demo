@@ -1,52 +1,37 @@
 <script lang="ts">
-	import StatusIcon from '#lib/components/StatusIcon.svelte';
+	import SignInGate from '#lib/components/SignInGate.svelte';
+	import StatusRow from '#lib/components/StatusRow.svelte';
+	import { act, form } from '#lib/check.js';
+	import { getPage } from '#lib/status.svelte.js';
 
-	let { enabled }: { enabled: boolean } = $props();
+	let { enabled, domain }: { enabled: boolean; domain: string } = $props();
 
-	let statusText = $state('Not checked');
-	let statusOk = $state(false);
-	let topic = $state('epochcloud-demo');
-	let message = $state('');
+	const { account } = getPage();
+
+	let topic = $state('');
 	let result = $state('');
 	let resultOk = $state(false);
-	let resultVisible = $state(false);
 
-	async function checkStatus() {
-		statusText = 'Checking...';
-		try {
-			const resp = await fetch('/ntfy/status');
-			const d = await resp.json();
-			statusOk = d.connected;
-			statusText = d.connected ? 'Connected' : `Disconnected${d.error ? ' - ' + d.error : ''}`;
-		} catch (err) {
-			statusText = `Error: ${err}`;
-			statusOk = false;
+	// The topic is the one stored in the signed-in user's own row; the page can
+	// show it and subscribe to it, but never chooses it.
+	async function loadTopic() {
+		const r = await act('/ntfy/topic');
+		if (r.ok) topic = String(r.data!.topic);
+		else {
+			result = r.detail;
+			resultOk = false;
 		}
 	}
 
 	async function send() {
-		try {
-			const resp = await fetch('/ntfy/send', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					topic,
-					message: message || `Hello from EpochCloud at ${new Date().toLocaleTimeString()}`
-				})
-			});
-			const d = await resp.json();
-			result = d.success ? `Sent to "${d.topic}"` : d.error;
-			resultOk = d.success;
-			resultVisible = true;
-		} catch (err) {
-			result = String(err);
-			resultOk = false;
-			resultVisible = true;
-		}
+		const r = await act('/ntfy/send', form());
+		result = r.ok ? `Sent to your topic` : r.detail;
+		resultOk = r.ok;
+		if (r.ok) topic = String(r.data!.topic);
 	}
 
 	$effect(() => {
-		checkStatus();
+		if (account.session?.user.emailVerified) void loadTopic();
 	});
 </script>
 
@@ -55,43 +40,33 @@
 		<h3>ntfy</h3>
 		<span class="card-tag">Push Notifications</span>
 	</div>
-	<div class="status-row">
-		<button
-			onclick={checkStatus}
-			class="btn btn-outline btn-sm">Check Status</button
-		>
-		<StatusIcon
-			ok={statusOk}
-			checked={statusText !== 'Not checked'}
-		/>
-		<span class="status-text">{statusText}</span>
-	</div>
+	<StatusRow id="ntfy" />
 	{#if enabled}
-		<input
-			type="text"
-			bind:value={topic}
-			placeholder="Topic"
-			class="input"
-		/>
-		<input
-			type="text"
-			bind:value={message}
-			placeholder="Message (optional)"
-			class="input"
-		/>
-		<button
-			onclick={send}
-			class="btn btn-primary btn-sm w-full">Send Notification</button
-		>
-		{#if resultVisible}
-			<p
-				class="result"
-				class:ok={resultOk}
-				class:err={!resultOk}
+		<SignInGate>
+			{#if topic}
+				<p class="card-desc">
+					Your private topic is <code>{topic}</code>. Subscribe in the ntfy app or at
+					<a
+						href="https://ntfy.{domain}/{topic}"
+						target="_blank"
+						rel="noopener">ntfy.{domain}/{topic}</a
+					>, then send the test notification.
+				</p>
+			{/if}
+			<button
+				onclick={send}
+				class="btn btn-primary btn-sm w-full">Send me a test notification</button
 			>
-				{result}
-			</p>
-		{/if}
+			{#if result}
+				<p
+					class="result"
+					class:ok={resultOk}
+					class:err={!resultOk}
+				>
+					{result}
+				</p>
+			{/if}
+		</SignInGate>
 	{:else}
 		<p class="disabled-msg">Not configured - NTFY_URL not set</p>
 	{/if}

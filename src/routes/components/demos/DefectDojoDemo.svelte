@@ -1,11 +1,13 @@
 <script lang="ts">
-	import StatusIcon from '#lib/components/StatusIcon.svelte';
+	import StatusRow from '#lib/components/StatusRow.svelte';
+	import { getPage } from '#lib/status.svelte.js';
 
 	let { enabled, domain }: { enabled: boolean; domain: string } = $props();
 
-	let statusText = $state('Not checked');
-	let statusOk = $state(false);
-	let findings: { total: number; by_severity: Record<string, number> } | null = $state(null);
+	// The counts come with the status answer (one cached call), so the panel
+	// shows exactly what the check read.
+	const { board } = getPage();
+	const findings = $derived((board.get('defectdojo').data?.findings as { total: number; by_severity: Record<string, number> } | undefined) ?? null);
 
 	const severityColors: Record<string, string> = {
 		Critical: 'var(--danger)',
@@ -14,29 +16,6 @@
 		Low: 'var(--accent)',
 		Info: 'var(--muted-fg)'
 	};
-
-	async function checkStatus() {
-		statusText = 'Checking...';
-		try {
-			const resp = await fetch('/defectdojo/status');
-			const d = await resp.json();
-			statusOk = d.connected;
-			statusText = d.connected ? `Connected - ${d.product_count} products` : 'Disconnected';
-
-			if (d.connected) {
-				const fr = await fetch('/defectdojo/findings');
-				const f = await fr.json();
-				if (f.success) findings = f.findings;
-			}
-		} catch (err) {
-			statusText = `Error: ${err}`;
-			statusOk = false;
-		}
-	}
-
-	$effect(() => {
-		checkStatus();
-	});
 </script>
 
 <div class="card">
@@ -44,17 +23,7 @@
 		<h3>DefectDojo</h3>
 		<span class="card-tag">Security</span>
 	</div>
-	<div class="status-row">
-		<button
-			onclick={checkStatus}
-			class="btn btn-outline btn-sm">Check Status</button
-		>
-		<StatusIcon
-			ok={statusOk}
-			checked={statusText !== 'Not checked'}
-		/>
-		<span class="status-text">{statusText}</span>
-	</div>
+	<StatusRow id="defectdojo" />
 	{#if findings}
 		<div class="findings-grid">
 			{#each Object.entries(findings.by_severity) as [sev, count] (sev)}
@@ -73,7 +42,7 @@
 			</div>
 		</div>
 	{/if}
-	{#if enabled && domain}
+	{#if domain}
 		<a
 			href="https://defectdojo.{domain}"
 			target="_blank"
@@ -81,8 +50,6 @@
 			class="btn btn-ghost btn-sm w-full"
 			style="margin-top:0.5rem">Open Dashboard</a
 		>
-	{:else if !enabled}
-		<p class="disabled-msg">Not configured - DEFECTDOJO_URL not set</p>
 	{/if}
 </div>
 

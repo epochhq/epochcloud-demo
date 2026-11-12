@@ -26,6 +26,9 @@ export const config = {
 	environment: env.ENVIRONMENT || 'dev',
 	port: parseInt(env.PORT || '3000'),
 	hostname: env.HOSTNAME || 'unknown',
+	// Set from the downward API; the resolver falls back to the pod's DNS
+	// search domain (see namespace.ts).
+	podNamespace: env.POD_NAMESPACE || '',
 	startedAt: new Date().toISOString(),
 
 	// Consumer mode
@@ -74,6 +77,8 @@ export const config = {
 	defectdojo: {
 		url: env.DEFECTDOJO_URL || '',
 		token: defectdojoToken,
+		// The product whose findings the page shows; other tenants' stay hidden.
+		product: env.DEFECTDOJO_PRODUCT || 'epochcloud-demo',
 		get enabled() {
 			return !!(env.DEFECTDOJO_URL && defectdojoToken);
 		}
@@ -92,9 +97,9 @@ export const config = {
 	smtp: {
 		host: env.SMTP_HOST || '',
 		port: parseInt(env.SMTP_PORT || '587'),
-		from: env.SMTP_FROM || 'noreply@epoch.engineering',
+		from: env.SMTP_FROM || '',
 		get enabled() {
-			return !!env.SMTP_HOST;
+			return !!(env.SMTP_HOST && env.SMTP_FROM);
 		}
 	},
 
@@ -119,6 +124,9 @@ export const config = {
 		url: env.NTFY_URL || '',
 		user: readSecret('NTFY_USER') || '',
 		password: readSecret('NTFY_PASSWORD') || '',
+		// Every topic the app publishes to starts with this prefix. A per-app
+		// ntfy user is granted write access to exactly `<prefix>-*`.
+		topicPrefix: env.NTFY_TOPIC_PREFIX || 'epochcloud-demo',
 		get enabled() {
 			return !!env.NTFY_URL;
 		}
@@ -143,6 +151,8 @@ export const config = {
 
 	// Grafana Faro frontend observability
 	faro: {
+		// Where the collector accepts browser telemetry; unset disables the relay.
+		receiverUrl: env.FARO_RECEIVER_URL || '',
 		get enabled() {
 			return env.FARO_ENABLED === 'true';
 		}
