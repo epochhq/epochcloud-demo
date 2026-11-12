@@ -63,6 +63,7 @@
 		<span class="card-tag">Database</span>
 	</div>
 	<StatusRow id="cnpg" />
+	<span class="env-pill">env: {environment}</span>
 	{#if enabled}
 		<SignInGate>
 			<div class="form-cols">

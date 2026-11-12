@@ -57,11 +57,13 @@ epochcloud-demo/
 │       ├── metrics/+server.ts    # GET /metrics
 │       ├── version/+server.ts    # GET /version
 │       ├── chaos/+server.ts      # GET /chaos
-│       ├── rabbitmq/             # /rabbitmq/status, /rabbitmq/publish
-│       ├── cache/                # /cache/status, /cache/set, /cache/get
-│       ├── defectdojo/           # /defectdojo/status
-│       ├── auth/                 # /auth/status, /auth/session
-│       └── email/                # /email/send
+│       ├── status/[name]/        # GET: the server's latest check of one integration
+│       ├── health/ version/ robots.txt/
+│       ├── email/send            # POST, signed in: test mail to the session's address
+│       ├── ntfy/send, ntfy/topic # POST / GET, signed in: test notification to the user's own topic
+│       ├── rabbitmq/ cache/ cnpg/ features/ knative/ prometheus/increment chaos/
+│       │                         # interactive demos, all signed in; writes are form POSTs
+│       └── auth/session          # GET: who the server sees behind the cookies
 └── renovate.json
 ```
 
@@ -103,6 +105,20 @@ One-time setup: a running `podman machine` and the scoped Harbor push
 credentials in a gitignored `.env` (see `.env.example`). The full signing
 model is documented in the epochcloud repo: keyless-signing.md.
 
+## Public surface and timeouts
+
+The anonymous page reads a status snapshot that the server refreshes itself
+(`src/lib/server/snapshot.ts`, `checks.ts`): a visitor never causes an upstream
+call. Every route that writes, sends, spends or looks something up on request
+needs the app's own sign-in, is a form-encoded POST so SvelteKit's origin check
+always applies (`src/lib/server/guard.ts`), and takes no target (address, topic,
+key, URL) from the request. Bun cuts a request that writes nothing for its idle
+timeout and the app would still log 200 for it, so the timeout is stated in
+`src/lib/limits.ts` at Bun's default and every outbound call and deliberate delay
+is bounded well below it; `tests/local/budgets.test.ts` keeps it that way. The
+Prometheus and Linkerd tabs render a data array of namespace-limited queries
+(`src/lib/server/proofs.ts`): one more entry proves one more capability.
+
 ## Environment Variables
 
 | Variable                      | Default                     | Description                                           |
@@ -124,7 +140,13 @@ model is documented in the epochcloud repo: keyless-signing.md.
 | `DEFECTDOJO_TOKEN`            |                             | DefectDojo API token                                  |
 | `SMTP_HOST`                   | _(disabled)_                | Maddy SMTP relay host                                 |
 | `SMTP_PORT`                   | `587`                       | SMTP port                                             |
-| `SMTP_FROM`                   | `noreply@epoch.engineering` | Sender address                                        |
+| `SMTP_FROM`                   | _(email disabled)_          | Sender address; the test mail needs it                |
+| `POD_NAMESPACE`               | pod DNS search path         | Namespace the Prometheus proofs are limited to        |
+| `DEFECTDOJO_PRODUCT`          | `epochcloud-demo`           | The only product whose findings the page shows        |
+| `NTFY_URL`                    | _(disabled)_                | ntfy server; topics are `NTFY_TOPIC_PREFIX-<env>-...` |
+| `NTFY_TOPIC_PREFIX`           | `epochcloud-demo`           | Prefix every published topic must start with          |
+| `FARO_RECEIVER_URL`           | _(relay disabled)_          | Collector the browser telemetry relay forwards to     |
+| `PROMETHEUS_URL`              | _(disabled)_                | Prometheus the proofs query                           |
 | `BETTERAUTH_URL`              | _(disabled)_                | BetterAuth server URL                                 |
 | `RYBBIT_SITE_ID`              |                             | Rybbit analytics site ID                              |
 | `RYBBIT_HOST`                 |                             | Rybbit analytics host                                 |
