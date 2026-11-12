@@ -77,6 +77,27 @@ it('reads No data, never Failed, on a row that counts traffic when nothing came'
 	for (const id of traffic) expect(proofs.find((proof) => proof.id === id)?.state, id).toBe('ok');
 });
 
+it('reads the Traefik plaintext row as ok at 0 and Failed above 0, and the mTLS row as No data at 0', async () => {
+	const answer = (plaintext: number) => async (url: string) => {
+		const q = decodeURIComponent(new globalThis.URL(url).searchParams.get('query') ?? '');
+		const value = q.includes('tls!="true"') ? plaintext : 0;
+		return Response.json({ status: 'success', data: { result: [{ metric: {}, value: [0, String(value)] }] } });
+	};
+	for (const [plaintext, state] of [
+		[0, 'ok'],
+		[1, 'failed'],
+		[7, 'failed']
+	] as const) {
+		vi.stubGlobal('fetch', answer(plaintext));
+		const proofs = await evaluateProofs('epochcloud-demo-dev', 'linkerd');
+		expect(
+			proofs.find((proof) => proof.id === 'plaintext-traefik'),
+			`plaintext ${plaintext}`
+		).toMatchObject({ answered: true, state });
+		expect(proofs.find((proof) => proof.id === 'mtls-traefik')?.state).toBe('nodata');
+	}
+});
+
 it('tells a query that answered with no data from one that failed', async () => {
 	vi.stubGlobal('fetch', async (url: string) => {
 		const q = decodeURIComponent(new globalThis.URL(url).searchParams.get('query') ?? '');

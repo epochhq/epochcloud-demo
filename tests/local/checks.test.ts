@@ -45,6 +45,9 @@ const outbound = (dst: { namespace: string; serviceaccount: string; pod: string 
 });
 const toApp = (extra: Labels = {}, namespace = NAMESPACE) =>
 	outbound({ namespace, serviceaccount: 'epochcloud-demo', pod: 'epochcloud-demo-c888dc596-mw77d' }, extra);
+/** The same series from Prometheus's own proxy, which scrapes the app and so also sends it requests (live label shape). */
+const fromPrometheus = (extra: Labels = {}) =>
+	toApp({ namespace: 'monitoring', pod: 'prometheus-kube-prometheus-stack-prometheus-0', instance: '10.244.0.5:4191', ...extra });
 const toBetterauth = (extra: Labels = {}) =>
 	outbound({ namespace: NAMESPACE, serviceaccount: 'epochcloud-demo-betterauth', pod: 'epochcloud-demo-betterauth-bd44b6d7f-kd2th' }, extra);
 
@@ -82,10 +85,10 @@ function selects(query: string, labels: Labels): boolean {
 	return true;
 }
 
-function prometheus(series: Labels[], failing = false) {
+function prometheus(series: Labels[], failing: boolean | ((query: string) => boolean) = false) {
 	vi.stubGlobal('fetch', async (url: string) => {
 		const q = decodeURIComponent(new globalThis.URL(url).searchParams.get('query') ?? '');
-		if (failing) return new Response('boom', { status: 500 });
+		if (typeof failing === 'function' ? failing(q) : failing) return new Response('boom', { status: 500 });
 		// The existence form: count(last_over_time(request_total{...}[10m])) counts the series in the window.
 		const count = q.startsWith('count(last_over_time(request_total{') ? series.filter((labels) => selects(q, labels)).length : 0;
 		return Response.json({ status: 'success', data: { result: count ? [{ metric: {}, value: [0, String(count)] }] : [] } });
@@ -117,6 +120,23 @@ it('is not running, never failed, on the default-policy series a new pod and a B
 	expect(await response.json()).toMatchObject(NOT_RUNNING);
 });
 
+it("is not running when the only series toward the app are Prometheus's own scrapes", async () => {
+	prometheus([fromPrometheus()]);
+	await refresh('linkerd', 2_500);
+	const response = snapshotResponse('linkerd', 2_500);
+	expect(response.status).toBe(200);
+	expect(await response.json()).toMatchObject(NOT_RUNNING);
+});
+
+it('does not fail on a plaintext series from a source other than Traefik', async () => {
+	prometheus([fromPrometheus({ tls: 'no_identity', no_tls_reason: 'no_tls_from_remote' })]);
+	await refresh('linkerd', 2_600);
+	expect(await snapshotResponse('linkerd', 2_600).json()).toMatchObject(NOT_RUNNING);
+	prometheus([toApp(), fromPrometheus({ tls: 'no_identity', no_tls_reason: 'no_tls_from_remote' })]);
+	await refresh('linkerd', 2_700);
+	expect(await snapshotResponse('linkerd', 2_700).json()).toMatchObject({ connected: true, mtls_series_10m: 1 });
+});
+
 it('does not count what Traefik sends to BetterAuth, or to the app of another environment', async () => {
 	prometheus([toBetterauth(), toBetterauth({ tls: 'no_identity' }), toApp({}, 'epochcloud-demo-prod'), toApp({ tls: 'no_identity' }, 'epochcloud-demo-prod')]);
 	await refresh('linkerd', 3_000);
@@ -139,6 +159,15 @@ it.each(['no_identity', 'false'])('fails, with 503, when Traefik sent the app re
 	const response = snapshotResponse('linkerd', 5_000);
 	expect(response.status).toBe(503);
 	expect(await response.json()).toMatchObject({ connected: false, error: 'the check failed' });
+});
+
+it.each([
+	['plaintext', (query: string) => query.includes('tls!="true"')],
+	['mTLS', (query: string) => query.includes('tls="true"')]
+])('fails, with 503, when only the %s query does not answer', async (_name, failing) => {
+	prometheus([toApp()], failing);
+	await refresh('linkerd', 5_500);
+	expect(snapshotResponse('linkerd', 5_500).status).toBe(503);
 });
 
 it('fails, with 503, when the queries do not answer', async () => {
