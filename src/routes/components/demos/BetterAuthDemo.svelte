@@ -14,7 +14,12 @@
 	// dateStyle and timeStyle cannot be combined with timeZoneName (ECMA-402), so the fields are named one by one.
 	const expires = (iso: string) =>
 		new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
-	const fieldsOf = (element: HTMLFormElement) => Object.fromEntries(new globalThis.FormData(element)) as Record<string, string>;
+	// The submitted form's fields; the page handles the submit itself.
+	const fieldsOf = (event: { preventDefault(): void; currentTarget: ConstructorParameters<typeof globalThis.FormData>[0] }) => {
+		event.preventDefault();
+		return Object.fromEntries(new globalThis.FormData(event.currentTarget)) as Record<string, string>;
+	};
+	type Submit = Parameters<typeof fieldsOf>[0];
 	const unconfirmed = $derived(account.session ? !account.session.user.emailVerified : account.pending !== '');
 
 	async function post(url: string, fields: Record<string, string>) {
@@ -26,17 +31,15 @@
 		return result;
 	}
 
-	async function signIn(event: SubmitEvent) {
-		event.preventDefault();
-		const fields = fieldsOf(event.currentTarget as HTMLFormElement);
+	async function signIn(event: Submit) {
+		const fields = fieldsOf(event);
 		const result = await post('/auth/sign-in', fields);
 		if (result.data?.reason === 'unverified') account.pending = fields.email ?? '';
 		if (result.ok) await account.refresh();
 	}
 
-	async function signUp(event: SubmitEvent) {
-		event.preventDefault();
-		const fields = fieldsOf(event.currentTarget as HTMLFormElement);
+	async function signUp(event: Submit) {
+		const fields = fieldsOf(event);
 		if ((await post('/auth/sign-up', fields)).ok) account.pending = fields.email ?? '';
 	}
 
