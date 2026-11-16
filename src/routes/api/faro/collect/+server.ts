@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { config } from '#lib/server/config.js';
-import { json, upstream } from '#lib/server/http.js';
+import { clientAddress, json, upstream } from '#lib/server/http.js';
 import { createLimiter } from '#lib/server/ratelimit.js';
 
 // The browser telemetry relay stays anonymous, because the page sends it before
@@ -14,13 +14,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const declared = Number(request.headers.get('content-length') ?? 0);
 	if (declared > MAX_BYTES) return json({ error: 'payload too large' }, 413);
 
-	let client = 'unknown';
-	try {
-		client = getClientAddress();
-	} catch {
-		// no address behind this connection: one shared bucket
-	}
-	const limited = await perClient.take(client);
+	const limited = await perClient.take(clientAddress(getClientAddress));
 	if (limited) return limited;
 
 	const body = await request.text();

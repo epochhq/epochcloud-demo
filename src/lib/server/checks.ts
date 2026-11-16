@@ -31,9 +31,16 @@ defineChecks([
 		name: 'betterauth',
 		enabled: () => config.betterauth.enabled,
 		missing: 'BetterAuth not configured',
+		// A sign-in for an address that cannot exist (the .invalid TLD, RFC 2606):
+		// BetterAuth refuses it with 401 only after looking it up in its database,
+		// so this passes only when signing in works end to end.
 		run: async () => {
-			const resp = await upstream(`${config.betterauth.url}/ready`);
-			if (!resp.ok) throw new Error(`BetterAuth answered ${resp.status}`);
+			const resp = await upstream(`${config.betterauth.url}/api/auth/sign-in/email`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ email: 'status-check@example.invalid', password: 'status-check-password' })
+			});
+			if (resp.status !== 401) throw new Error(`a sign-in attempt got HTTP ${resp.status}, not the refusal it expects`);
 		}
 	},
 	{

@@ -36,6 +36,8 @@ export class AccountState {
 	loaded = $state(false);
 	session = $state<SessionView | null>(null);
 	problem = $state('');
+	/** An address that signed up or tried to sign in before confirming it. */
+	pending = $state('');
 
 	async refresh(): Promise<void> {
 		const result = await runCheck('/auth/session');
@@ -53,6 +55,8 @@ export class AccountState {
 export interface PageState {
 	board: StatusBoard;
 	account: AccountState;
+	/** Shows a demo tab, as clicking it would. */
+	open: (id: string) => void;
 }
 
 export const [getPage, setPage] = createContext<PageState>();

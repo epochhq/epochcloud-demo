@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import { lookupLimiter } from '#lib/server/access.js';
 import { config } from '#lib/server/config.js';
-import { json, isTimeout } from '#lib/server/http.js';
+import { clientAddress, json, isTimeout } from '#lib/server/http.js';
 import { getSession, hasSessionCookie } from '#lib/server/session.js';
 
 // What the server sees behind the browser's cookies: who, whether the address
@@ -12,13 +12,7 @@ export const GET: RequestHandler = async ({ request, getClientAddress }) => {
 	if (!config.betterauth.enabled) return json({ success: true, signed_in: false, session: null });
 	if (!hasSessionCookie(request)) return json({ success: true, signed_in: false, session: null });
 
-	let client = 'unknown';
-	try {
-		client = getClientAddress();
-	} catch {
-		// no address behind this connection: one shared bucket
-	}
-	const limited = await lookupLimiter.take(client);
+	const limited = await lookupLimiter.take(clientAddress(getClientAddress));
 	if (limited) return limited;
 	try {
 		const session = await getSession(request);

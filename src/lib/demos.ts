@@ -14,7 +14,7 @@ export const DEMOS: DemoTab[] = [
 	{ id: 'valkey', label: 'Valkey', statusUrl: '/status/valkey', describe: () => 'PING answered PONG' },
 	{ id: 'cnpg', label: 'CNPG', statusUrl: '/status/cnpg', describe: (d) => `Query answered, ${n(d.items)} items` },
 	{ id: 'email', label: 'Email', statusUrl: '/status/email', describe: () => 'Mail relay accepted the SMTP handshake' },
-	{ id: 'betterauth', label: 'Account', statusUrl: '/status/betterauth', describe: () => 'BetterAuth reports ready' },
+	{ id: 'betterauth', label: 'Account', statusUrl: '/status/betterauth', describe: () => 'BetterAuth checked a sign-in against its database' },
 	{ id: 'crowdsec', label: 'CrowdSec', statusUrl: '/status/crowdsec', describe: () => 'LAPI accepted the bouncer key' },
 	{
 		id: 'defectdojo',

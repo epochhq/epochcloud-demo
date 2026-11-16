@@ -7,7 +7,12 @@ import { getSession, hasSessionCookie, type Session } from './session.js';
 // request that changes anything must be a form-encoded POST so SvelteKit's
 // origin check applies. A new route is therefore closed until someone opens it
 // on purpose, and tests/local/access.test.ts holds the list.
-export const ANONYMOUS_ROUTES = ['/', '/health', '/version', '/robots.txt', '/metrics', '/auth/session', '/api/faro/collect'];
+// Signing up, in and out and asking for the confirmation mail again are open
+// to visitors on purpose: they are how a visitor gets a session. They still
+// change state, so they take form POSTs only, and src/lib/server/signin.ts
+// bounds each per client address and per target mail address.
+export const SIGN_IN_ROUTES = ['/auth/sign-in', '/auth/sign-up', '/auth/sign-out', '/auth/resend'];
+export const ANONYMOUS_ROUTES = ['/', '/health', '/version', '/robots.txt', '/metrics', '/auth/session', '/api/faro/collect', ...SIGN_IN_ROUTES];
 export const ANONYMOUS_PREFIXES = ['/status/', '/_app/'];
 
 export const isAnonymous = (pathname: string): boolean =>
@@ -23,12 +28,14 @@ export const lookupLimiter = createLimiter({ points: 60, durationSeconds: 60 });
 
 /** Null when the request may proceed; otherwise the refusal. `session` is set on success. */
 export async function authorize(request: Request, pathname: string, client: string): Promise<{ refusal: Response } | { session: Session | null }> {
-	if (isAnonymous(pathname)) return { session: null };
+	const signIn = SIGN_IN_ROUTES.includes(pathname);
+	if (isAnonymous(pathname) && !signIn) return { session: null };
 
 	if (!SAFE_METHODS.has(request.method)) {
 		const type = (request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
 		if (!FORM_TYPES.has(type)) return { refusal: json({ success: false, error: 'POST a form-encoded body so the origin check applies' }, 415) };
 	}
+	if (signIn) return { session: null };
 	if (!hasSessionCookie(request)) return { refusal: json({ success: false, reason: 'unauthenticated', error: 'sign in to try this' }, 401) };
 
 	const limitedLookup = await lookupLimiter.take(client);

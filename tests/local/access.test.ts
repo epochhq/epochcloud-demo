@@ -24,7 +24,7 @@ vi.mock('#lib/server/checks.js', () => ({}));
 vi.mock('#lib/server/snapshot.js', () => ({ startSnapshots: vi.fn() }));
 
 import { handle } from '../../src/hooks.server.js';
-import { ANONYMOUS_PREFIXES, ANONYMOUS_ROUTES } from '../../src/lib/server/access.js';
+import { ANONYMOUS_PREFIXES, ANONYMOUS_ROUTES, SIGN_IN_ROUTES } from '../../src/lib/server/access.js';
 import { HANDLER_WAITS } from '../../src/lib/limits.js';
 import { getSession } from '../../src/lib/server/session.js';
 import { httpRequestsTotal } from '../../src/lib/server/metrics.js';
@@ -33,7 +33,19 @@ import { httpRequestsTotal } from '../../src/lib/server/metrics.js';
 // over every route module in the tree, so a new route is closed until it is
 // opened on purpose, and removing the check from any one route cannot go unseen.
 
-const ANONYMOUS = ['/api/faro/collect', '/auth/session', '/health', '/metrics', '/robots.txt', '/status/x', '/version'];
+const ANONYMOUS = [
+	'/api/faro/collect',
+	'/auth/resend',
+	'/auth/session',
+	'/auth/sign-in',
+	'/auth/sign-out',
+	'/auth/sign-up',
+	'/health',
+	'/metrics',
+	'/robots.txt',
+	'/status/x',
+	'/version'
+];
 
 const modules = Object.keys(import.meta.glob('/src/routes/**/+server.ts')).map((file) =>
 	file.replace('/src/routes', '').replace('/+server.ts', '').replace('[name]', 'x')
@@ -120,6 +132,20 @@ it('requires a form-encoded body for every request that changes anything', async
 		const response = await run(event('/email/send', { method: 'POST', cookie: 'demo.session_token=abc', type })).done;
 		expect(response.status).toBe(415);
 	}
+});
+
+it("takes only form-encoded POSTs on the sign-in routes, so SvelteKit's origin check always applies", async () => {
+	for (const path of SIGN_IN_ROUTES) {
+		for (const type of ['application/json', undefined, 'text/plain']) {
+			const { resolve, done } = run(event(path, { method: 'POST', type }));
+			expect((await done).status, `${path} ${type}`).toBe(415);
+			expect(resolve).not.toHaveBeenCalled();
+		}
+		const { resolve, done } = run(event(path, { method: 'POST', type: 'application/x-www-form-urlencoded' }));
+		expect((await done).status).toBe(200);
+		expect(resolve).toHaveBeenCalledOnce();
+	}
+	expect(sessionFetch).not.toHaveBeenCalled();
 });
 
 it('limits a signed-in user to 60 calls a minute, whichever address they come from', async () => {

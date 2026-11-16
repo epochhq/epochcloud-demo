@@ -15,6 +15,15 @@ export function upstream(url: string, init: RequestInit = {}, timeoutMs = UPSTRE
 	return fetch(url, { ...init, signal: init.signal ?? AbortSignal.timeout(timeoutMs) });
 }
 
+/** The caller's address for per-address limits; a connection without one shares one bucket. */
+export function clientAddress(getClientAddress: () => string): string {
+	try {
+		return getClientAddress();
+	} catch {
+		return 'unknown';
+	}
+}
+
 /** A text field of a form body; anything else (absent, a file) reads as the fallback. */
 export function field(form: FormData, name: string, fallback = ''): string {
 	const value = form.get(name);
