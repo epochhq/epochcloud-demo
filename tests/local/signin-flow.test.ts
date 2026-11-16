@@ -39,7 +39,7 @@ const mails: string[] = [];
 
 vi.stubGlobal('fetch', async (url: string, init: RequestInit = {}) => {
 	const path = new globalThis.URL(url).pathname.replace('/api/auth', '');
-	const body = JSON.parse(String(init.body ?? '{}')) as Record<string, string>;
+	const body = JSON.parse((init.body as string | undefined) ?? '{}') as Record<string, string>;
 	const token = /demo\.session_token=([^;]+)/.exec(new Headers(init.headers).get('cookie') ?? '')?.[1] ?? '';
 	if (path === '/sign-up/email') {
 		if (!users.has(body.email!)) users.set(body.email!, { password: body.password!, verified: false });

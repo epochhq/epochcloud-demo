@@ -33,7 +33,7 @@ function betterAuth(answer?: (path: string, body: Record<string, string>) => Res
 	calls.length = 0;
 	vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
 		const path = new globalThis.URL(url).pathname.replace('/api/auth', '');
-		const body = JSON.parse(String(init.body ?? '{}')) as Record<string, string>;
+		const body = JSON.parse((init.body as string | undefined) ?? '{}') as Record<string, string>;
 		calls.push({ path, body, headers: new Headers(init.headers) });
 		if (answer) return answer(path, body);
 		if (path === '/sign-in/email') {
@@ -78,8 +78,9 @@ it('gives a wrong password and an unknown address the same answer', async () => 
 	const unknown = await post(signIn, { email: 'nobody@example.test', password: 'wrong' });
 	expect([wrong.status, unknown.status]).toEqual([401, 401]);
 	const strip = async (r: Response) => ({ ...((await r.json()) as Record<string, unknown>), timestamp: 0 });
-	expect(await strip(wrong)).toEqual(await strip(unknown));
-	expect(await strip(unknown)).toMatchObject({ error: WRONG });
+	const [wrongBody, unknownBody] = [await strip(wrong), await strip(unknown)];
+	expect(wrongBody).toEqual(unknownBody);
+	expect(unknownBody).toMatchObject({ error: WRONG });
 	expect(unknown.headers.getSetCookie()).toEqual([]);
 });
 

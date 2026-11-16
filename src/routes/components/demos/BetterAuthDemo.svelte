@@ -11,8 +11,10 @@
 	let isError = $state(false);
 	let busy = $state(false);
 
-	const expires = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZoneName: 'short' });
-	const fieldsOf = (element: HTMLFormElement) => Object.fromEntries(new FormData(element)) as Record<string, string>;
+	// dateStyle and timeStyle cannot be combined with timeZoneName (ECMA-402), so the fields are named one by one.
+	const expires = (iso: string) =>
+		new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+	const fieldsOf = (element: HTMLFormElement) => Object.fromEntries(new globalThis.FormData(element)) as Record<string, string>;
 	const unconfirmed = $derived(account.session ? !account.session.user.emailVerified : account.pending !== '');
 
 	async function post(url: string, fields: Record<string, string>) {
