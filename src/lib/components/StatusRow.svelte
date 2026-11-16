@@ -36,6 +36,8 @@
 		class="status-text"
 		role="status"
 	>
-		<strong>{WORDS[entry.state]}</strong>{entry.detail ? ` - ${entry.detail}` : ''}
+		{#if entry.state === 'ok'}{entry.detail}{:else}<strong>{WORDS[entry.state]}</strong>{entry.detail
+				? ` - ${entry.detail}`
+				: ''}{/if}
 	</span>
 </div>

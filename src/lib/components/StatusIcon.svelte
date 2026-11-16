@@ -2,8 +2,9 @@
 	import { WORDS, type CheckState } from '#lib/check.js';
 
 	// Each state has its own shape as well as its own colour, so the state never
-	// depends on colour alone (WCAG 2.2 SC 1.4.1). The word is shown by the
-	// caller or, with `showWord`, by this component.
+	// depends on colour alone (WCAG 2.2 SC 1.4.1). OK is a filled green dot and
+	// carries its word for assistive technology only; every other state shows
+	// its word, from the caller or, with `showWord`, from this component.
 	let { state, showWord = false }: { state: CheckState; showWord?: boolean } = $props();
 </script>
 
@@ -21,7 +22,13 @@
 		stroke-linejoin="round"
 	>
 		{#if state === 'ok'}
-			<path d="M3 8.5l3.2 3.2L13 4.8" />
+			<circle
+				cx="8"
+				cy="8"
+				r="4"
+				fill="currentColor"
+				stroke="none"
+			/>
 		{:else if state === 'failed'}
 			<path d="M4 4l8 8M12 4l-8 8" />
 		{:else if state === 'notrunning'}
@@ -47,7 +54,7 @@
 			/>
 		{/if}
 	</svg>
-	{#if showWord}<span class="word">{WORDS[state]}</span>{/if}
+	{#if state === 'ok'}<span class="sr-only">{WORDS[state]}</span>{:else if showWord}<span class="word">{WORDS[state]}</span>{/if}
 </span>
 
 <style>
@@ -71,6 +78,19 @@
 
 	.ok {
 		color: var(--success);
+	}
+
+	.ok svg {
+		filter: drop-shadow(0 0 3px rgba(34, 197, 94, 0.45));
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	.slow {
