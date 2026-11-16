@@ -1,14 +1,26 @@
 import { beforeEach, expect, it, vi } from 'vite-plus/test';
 
-const { claimCooldown, config } = vi.hoisted(() => ({
-	claimCooldown: vi.fn(),
+const { budgets, valkey, config } = vi.hoisted(() => ({
+	// Valkey's shared budgets, counted here without time: a test ends a window by deleting its counts.
+	budgets: new Map<string, number>(),
+	valkey: { up: true },
 	config: { podNamespace: 'epochcloud-demo-dev', betterauth: { enabled: true, url: 'http://auth.test' } }
 }));
 
 vi.mock('$app/env/private', () => ({ PROMETHEUS_URL: '' }));
 vi.mock('#lib/server/config.js', () => ({ config }));
 vi.mock('#lib/server/logger.js', () => ({ log: vi.fn() }));
-vi.mock('#lib/server/valkey.js', () => ({ claimCooldown, pingValkey: vi.fn() }));
+vi.mock('#lib/server/valkey.js', () => ({
+	pingValkey: vi.fn(),
+	sharedBudget: (name: string, points: number) => ({
+		take: async (key: string) => {
+			if (!valkey.up) return 'unavailable';
+			const count = (budgets.get(`${name}:${key}`) ?? 0) + 1;
+			budgets.set(`${name}:${key}`, count);
+			return count > points ? 'limited' : 'ok';
+		}
+	})
+}));
 vi.mock('#lib/server/rabbitmq.js', () => ({ getRabbitStatus: vi.fn() }));
 vi.mock('#lib/server/cnpg.js', () => ({ getCnpgStatus: vi.fn() }));
 vi.mock('#lib/server/smtp.js', () => ({ verifySmtp: vi.fn() }));
@@ -59,9 +71,14 @@ const post = (handler: unknown, fields: Record<string, string>, client = `client
 		getClientAddress: () => client
 	} as never);
 
+const endWindow = (name: string) => {
+	for (const key of budgets.keys()) if (key.startsWith(`${name}:`)) budgets.delete(key);
+};
+
 beforeEach(() => {
 	betterAuth();
-	claimCooldown.mockReset().mockResolvedValue(true);
+	budgets.clear();
+	valkey.up = true;
 });
 
 it('signs in, hands BetterAuth the page origin and the caller address, and passes its cookie on', async () => {
@@ -90,21 +107,31 @@ it('says an account needs confirming only to the caller who gave its password', 
 	expect(await response.json()).toMatchObject({ reason: 'unverified' });
 });
 
-it('limits sign-in attempts per client address and per account', async () => {
-	const fromOne: number[] = [];
-	for (let i = 0; i < 11; i++) fromOne.push((await post(signIn, { email: `a${i}@example.test`, password: 'x' }, 'one-address')).status);
-	expect(fromOne.slice(0, 10).every((status) => status === 401)).toBe(true);
-	expect(fromOne[10]).toBe(429);
+it('limits sign-in attempts per client address, an IPv6 /64 counting as one', async () => {
+	const statuses: number[] = [];
+	for (let i = 0; i < 11; i++) statuses.push((await post(signIn, { email: `a${i}@example.test`, password: 'x' }, `2001:db8:1:2::${i + 1}`)).status);
+	expect(statuses.slice(0, 10).every((status) => status === 401)).toBe(true);
+	expect(statuses[10]).toBe(429);
+	expect((await post(signIn, { email: 'a@example.test', password: 'x' }, '2001:db8:1:3::1')).status).toBe(401);
+});
 
-	const onOneAccount: number[] = [];
-	for (let i = 0; i < 11; i++) onOneAccount.push((await post(signIn, { email: 'target@example.test', password: 'x' })).status);
-	expect(onOneAccount[10]).toBe(429);
-	expect(calls).toHaveLength(20);
+it('counts only wrong passwords, so neither signing in often nor a guesser elsewhere locks the owner out', async () => {
+	const owner = { email: 'known@example.test', password: 'right-password' };
+	for (let i = 0; i < 6; i++) expect((await post(signIn, owner, '203.0.113.9')).status).toBe(200);
+	for (let i = 0; i < 5; i++) expect((await post(signIn, { ...owner, password: 'guess' }, '198.51.100.7')).status).toBe(401);
+	expect((await post(signIn, owner, '198.51.100.7')).status).toBe(429);
+	expect((await post(signIn, owner, '203.0.113.9')).status).toBe(200);
+});
+
+it('stops guessing at one account from many addresses at 100 wrong passwords an hour', async () => {
+	for (let i = 0; i < 100; i++) await post(signIn, { email: 'spread@example.test', password: 'guess' }, `192.0.2.${i}`);
+	expect((await post(signIn, { email: 'spread@example.test', password: 'guess' }, '192.0.2.200')).status).toBe(429);
 });
 
 it('answers a sign-up the same for a new and a registered address, with a confirmation link back to the app', async () => {
+	// BetterAuth answers 200 with no token for both, because it requires email verification.
+	betterAuth(() => Response.json({ token: null, user: { email: 'x' } }));
 	const fresh = await post(signUp, { name: 'N', email: 'fresh@example.test', password: 'long-enough' });
-	betterAuth(() => Response.json({ message: 'User already exists' }, { status: 422 }));
 	const taken = await post(signUp, { name: 'N', email: 'known@example.test', password: 'long-enough' });
 	expect([fresh.status, taken.status]).toEqual([200, 200]);
 	expect(await fresh.json()).toMatchObject({ message: SENT });
@@ -112,38 +139,64 @@ it('answers a sign-up the same for a new and a registered address, with a confir
 	expect(calls[0]!.body.callbackURL).toBe('https://demo.example.test/');
 });
 
-it('sends at most one confirmation mail per target address in the cooldown, for sign-up and resend alike', async () => {
-	await post(signUp, { email: 'Victim@Example.test', password: 'long-enough' });
-	await post(resend, { email: 'victim@example.test' });
-	const [first, second] = claimCooldown.mock.calls.map((call) => call[0] as string);
-	expect(first).toBe(second);
-	expect(first).not.toContain('victim');
-	expect(claimCooldown.mock.calls[0]![1]).toBe(300);
-
-	claimCooldown.mockResolvedValue(false);
+it('sends one confirmation mail per inbox in the cooldown, a +tag counting as the same inbox, and stores no address', async () => {
+	expect((await post(signUp, { email: 'Victim@Example.test', password: 'long-enough' })).status).toBe(200);
 	calls.length = 0;
-	expect((await post(signUp, { email: 'victim@example.test', password: 'long-enough' })).status).toBe(429);
-	expect((await post(resend, { email: 'victim@example.test' })).status).toBe(429);
+	expect((await post(resend, { email: 'victim+1@example.test' })).status).toBe(429);
+	expect((await post(signUp, { email: 'victim+2@example.test', password: 'long-enough' })).status).toBe(429);
+	expect(calls).toHaveLength(0);
+	expect([...budgets.keys()].some((key) => key.includes('victim'))).toBe(false);
+});
+
+it('sends an inbox at most 3 confirmation mails a day', async () => {
+	const statuses: number[] = [];
+	for (let i = 0; i < 4; i++) {
+		endWindow('mail-cooldown');
+		statuses.push((await post(resend, { email: `daily+${i}@example.test` })).status);
+	}
+	expect(statuses).toEqual([200, 200, 200, 429]);
+});
+
+it('sends at most 60 confirmation mails an hour for the whole demo', async () => {
+	const statuses: number[] = [];
+	for (let i = 0; i < 61; i++) statuses.push((await post(resend, { email: `inbox${i}@example.test` }, `192.0.2.${i}`)).status);
+	expect(statuses.slice(0, 60).every((status) => status === 200)).toBe(true);
+	expect(statuses[60]).toBe(429);
+	expect(calls).toHaveLength(60);
+});
+
+it('sends nothing, and says so, when the mail budgets cannot be counted', async () => {
+	valkey.up = false;
+	for (const response of [await post(signUp, { email: 'z@example.test', password: 'long-enough' }), await post(resend, { email: 'z@example.test' })]) {
+		expect(response.status).toBe(503);
+		expect(await response.json()).toMatchObject({ error: 'confirmation mails cannot be sent right now; nothing was sent' });
+	}
 	expect(calls).toHaveLength(0);
 });
 
-it('spends no cooldown on a sign-up that would be refused anyway', async () => {
+it('spends no mail budget on a sign-up that would be refused anyway', async () => {
 	for (const fields of [
 		{ email: 'not-an-address', password: 'long-enough' },
 		{ email: 'ok@example.test', password: 'short' }
 	])
 		expect((await post(signUp, fields)).status).toBe(400);
-	expect(claimCooldown).not.toHaveBeenCalled();
+	expect(budgets.size).toBe(0);
 	expect(calls).toHaveLength(0);
 });
 
-it('limits sign-ups and resends per client address', async () => {
-	for (const [handler, fields] of [
-		[signUp, { email: 'x@example.test', password: 'long-enough' }],
-		[resend, { email: 'x@example.test' }]
-	] as const) {
+it('limits sign-ups and resends per client address, an IPv6 /64 counting as one', async () => {
+	for (const handler of [signUp, resend]) {
 		const statuses: number[] = [];
-		for (let i = 0; i < 11; i++) statuses.push((await post(handler, fields, `busy-${String(handler === signUp)}`)).status);
+		for (let i = 0; i < 11; i++)
+			statuses.push(
+				(
+					await post(
+						handler,
+						{ email: `${handler === signUp ? 'up' : 'again'}${i}@example.test`, password: 'long-enough' },
+						`2001:db8:${handler === signUp ? 'a' : 'b'}::${i + 1}`
+					)
+				).status
+			);
 		expect(statuses.slice(0, 10).every((status) => status === 200)).toBe(true);
 		expect(statuses[10]).toBe(429);
 	}
@@ -162,7 +215,7 @@ it('says the sign-in service did not answer, on every route, when it times out',
 	for (const [handler, fields] of [
 		[signIn, { email: 'known@example.test', password: 'right-password' }],
 		[signUp, { email: 'y@example.test', password: 'long-enough' }],
-		[resend, { email: 'y@example.test' }]
+		[resend, { email: 'y2@example.test' }]
 	] as const) {
 		const response = await post(handler, fields);
 		expect(response.status).toBe(503);
@@ -189,5 +242,6 @@ it('passes the Account status check only when BetterAuth refuses an unknown sign
 		betterAuth(() => Response.json({}, { status }));
 		expect((await refresh('betterauth', 1_000, signal)).connected, `HTTP ${status}`).toBe(ok);
 		expect(calls[0]!.path).toBe('/sign-in/email');
+		expect(calls[0]!.headers.get('x-forwarded-for')).toBe('127.0.0.1');
 	}
 });

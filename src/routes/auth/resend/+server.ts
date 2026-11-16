@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { config } from '#lib/server/config.js';
-import { clientAddress, field, json } from '#lib/server/http.js';
+import { addressKey, clientAddress, field, json } from '#lib/server/http.js';
 import { unavailable } from '#lib/server/respond.js';
 import { SENT, address, addressLimiter, callAuth, claimMail, unreachable } from '#lib/server/signin.js';
 
@@ -9,7 +9,7 @@ import { SENT, address, addressLimiter, callAuth, claimMail, unreachable } from 
 export const POST: RequestHandler = async ({ request, url, getClientAddress }) => {
 	if (!config.betterauth.enabled) return unavailable('BetterAuth');
 	const client = clientAddress(getClientAddress);
-	const limited = await addressLimiter.take(`resend:${client}`);
+	const limited = await addressLimiter.take(`resend:${addressKey(client)}`);
 	if (limited) return limited;
 	const email = address(field(await request.formData(), 'email'));
 	if (!email) return json({ success: false, error: 'enter a valid email address' }, 400);

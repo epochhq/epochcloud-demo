@@ -11,6 +11,8 @@ import { evaluateProofs } from './proofs.js';
 import { prometheusEnabled } from './prometheus.js';
 import { NotRunning, defineChecks } from './snapshot.js';
 
+export const STATUS_CHECK_ADDRESS = '127.0.0.1';
+
 // Every integration the page reports on, as data. Each run proves its
 // capability against the real service: a round trip, a query, or a handshake.
 // Results carry no internal addresses; the page gets counts and words.
@@ -33,11 +35,12 @@ defineChecks([
 		missing: 'BetterAuth not configured',
 		// A sign-in for an address that cannot exist (the .invalid TLD, RFC 2606):
 		// BetterAuth refuses it with 401 only after looking it up in its database,
-		// so this passes only when signing in works end to end.
+		// so this passes only when signing in works end to end. It counts under the
+		// app's own loopback address in BetterAuth's per-address limit.
 		run: async () => {
 			const resp = await upstream(`${config.betterauth.url}/api/auth/sign-in/email`, {
 				method: 'POST',
-				headers: { 'content-type': 'application/json' },
+				headers: { 'content-type': 'application/json', 'x-forwarded-for': STATUS_CHECK_ADDRESS },
 				body: JSON.stringify({ email: 'status-check@example.invalid', password: 'status-check-password' })
 			});
 			if (resp.status !== 401) throw new Error(`a sign-in attempt got HTTP ${resp.status}, not the refusal it expects`);

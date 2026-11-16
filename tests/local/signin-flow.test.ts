@@ -17,8 +17,14 @@ vi.mock('#lib/server/config.js', () => ({
 vi.mock('#lib/server/logger.js', () => ({ log: vi.fn() }));
 vi.mock('#lib/server/rabbitmq.js', () => ({ initRabbitMQ: vi.fn(), closeRabbit: vi.fn() }));
 vi.mock('#lib/server/valkey.js', () => {
-	const held = new Set<string>();
-	return { initValkey: vi.fn(), closeValkey: vi.fn(), claimCooldown: async (key: string) => !held.has(key) && Boolean(held.add(key)) };
+	const spent = new Map<string, number>();
+	const sharedBudget = (name: string, points: number) => ({
+		take: async (key: string) => {
+			spent.set(`${name}:${key}`, (spent.get(`${name}:${key}`) ?? 0) + 1);
+			return spent.get(`${name}:${key}`)! > points ? 'limited' : 'ok';
+		}
+	});
+	return { initValkey: vi.fn(), closeValkey: vi.fn(), sharedBudget };
 });
 vi.mock('#lib/server/cnpg.js', () => ({ initCnpg: vi.fn(), closeCnpg: vi.fn() }));
 vi.mock('#lib/server/defectdojo.js', () => ({ initDefectDojo: vi.fn() }));

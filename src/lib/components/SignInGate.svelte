@@ -19,6 +19,9 @@
 
 {#if !account.loaded}
 	<p class="disabled-msg">Checking the session...</p>
+{:else if account.problem}
+	<!-- A failed lookup says nothing about the sign-in, so the visitor is not told to sign in again. -->
+	<p class="disabled-msg">Your sign-in could not be checked: {account.problem}.</p>
 {:else if !account.session || !account.session.user.emailVerified}
 	<p class="disabled-msg">
 		{account.session

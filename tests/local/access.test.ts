@@ -163,8 +163,8 @@ it('does not spend a client address lookup budget on requests that carry no sess
 });
 
 it('asks BetterAuth nothing for a request without a session cookie', async () => {
-	expect(await getSession(new Request('http://demo.test/', { headers: { cookie: 'theme=dark' } }))).toBeNull();
-	expect(await getSession(new Request('http://demo.test/'))).toBeNull();
+	expect(await getSession(new Request('http://demo.test/', { headers: { cookie: 'theme=dark' } }), 'c')).toBeNull();
+	expect(await getSession(new Request('http://demo.test/'), 'c')).toBeNull();
 	expect(sessionFetch).not.toHaveBeenCalled();
 });
 
@@ -173,6 +173,40 @@ it('limits the session lookups one client address can cause', async () => {
 	const statuses: number[] = [];
 	for (let i = 0; i < 61; i++) statuses.push((await run(event('/cache/get', { cookie: 'demo.session_token=junk', client: 'one-client-lookup' })).done).status);
 	expect(sessionFetch).toHaveBeenCalledTimes(60);
+	expect(statuses[60]).toBe(429);
+});
+
+it('sends the caller address with every session lookup, so junk cookies from a few addresses cannot sign everyone out', async () => {
+	// BetterAuth counts lookups per x-forwarded-for address, 100 per window; a call without one shares one bucket.
+	const buckets = new Map<string, number>();
+	sessionFetch.mockReset().mockImplementation(async (_url: string, init: RequestInit) => {
+		const headers = new Headers(init.headers);
+		const bucket = headers.get('x-forwarded-for') ?? 'no-trusted-ip';
+		buckets.set(bucket, (buckets.get(bucket) ?? 0) + 1);
+		if (buckets.get(bucket)! > 100) return Response.json({ message: 'Too many requests' }, { status: 429 });
+		return Response.json(
+			headers.get('cookie')?.includes('good')
+				? { user: { id: 'owner', email: 'o@example.test', name: 'O', emailVerified: true }, session: { expiresAt: '2030-01-01T00:00:00Z' } }
+				: null
+		);
+	});
+	for (const attacker of ['192.0.2.1', '192.0.2.2', '192.0.2.3'])
+		for (let i = 0; i < 60; i++) await run(event('/cache/get', { cookie: 'demo.session_token=junk', client: attacker })).done;
+	expect((await run(event('/cache/get', { cookie: 'demo.session_token=good', client: '203.0.113.50' })).done).status).toBe(200);
+});
+
+it('does not take a refused session lookup for a signed-out visitor', async () => {
+	sessionFetch.mockReset().mockImplementation(async () => Response.json({ message: 'Too many requests' }, { status: 429 }));
+	const response = await run(event('/cache/get', { cookie: 'demo.session_token=abc' })).done;
+	expect(response.status).toBe(503);
+	expect(await response.json()).toMatchObject({ reason: 'auth-unavailable' });
+});
+
+it('counts session lookups from one IPv6 /64 as one address', async () => {
+	sessionFor(null);
+	const statuses: number[] = [];
+	for (let i = 0; i < 61; i++)
+		statuses.push((await run(event('/cache/get', { cookie: 'demo.session_token=junk', client: `2001:db8:5:6::${i + 1}` })).done).status);
 	expect(statuses[60]).toBe(429);
 });
 

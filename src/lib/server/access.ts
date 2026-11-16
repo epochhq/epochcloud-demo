@@ -1,4 +1,4 @@
-import { json } from './http.js';
+import { addressKey, json } from './http.js';
 import { createLimiter } from './ratelimit.js';
 import { getSession, hasSessionCookie, type Session } from './session.js';
 
@@ -38,14 +38,16 @@ export async function authorize(request: Request, pathname: string, client: stri
 	if (signIn) return { session: null };
 	if (!hasSessionCookie(request)) return { refusal: json({ success: false, reason: 'unauthenticated', error: 'sign in to try this' }, 401) };
 
-	const limitedLookup = await lookupLimiter.take(client);
+	const limitedLookup = await lookupLimiter.take(addressKey(client));
 	if (limitedLookup) return { refusal: limitedLookup };
 
 	let session: Session | null;
 	try {
-		session = await getSession(request);
+		session = await getSession(request, client);
 	} catch {
-		return { refusal: json({ success: false, reason: 'auth-unavailable', error: 'the sign-in service did not answer' }, 503) };
+		return {
+			refusal: json({ success: false, reason: 'auth-unavailable', error: 'the sign-in service could not check your session; try again in a moment' }, 503)
+		};
 	}
 	if (!session) return { refusal: json({ success: false, reason: 'unauthenticated', error: 'sign in to try this' }, 401) };
 	if (!session.user.emailVerified) return { refusal: json({ success: false, reason: 'unverified', error: 'verify your email address to try this' }, 403) };

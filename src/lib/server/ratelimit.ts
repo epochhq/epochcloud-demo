@@ -12,6 +12,15 @@ export interface Limit {
 export interface Limiter {
 	/** Null when the key may proceed, else the 429 answer to return. */
 	take(key: string): Promise<Response | null>;
+	/** Like take, but spends nothing: for limits that count only failures. */
+	check(key: string): Promise<Response | null>;
+}
+
+function tooMany(msBeforeNext: number | undefined): Response {
+	const retryAfter = Math.max(1, Math.ceil((msBeforeNext ?? 1000) / 1000));
+	const response = json({ success: false, error: 'rate limited', retry_after_seconds: retryAfter }, 429);
+	response.headers.set('Retry-After', String(retryAfter));
+	return response;
 }
 
 export function createLimiter(limit: Limit): Limiter {
@@ -22,11 +31,12 @@ export function createLimiter(limit: Limit): Limiter {
 				await limiter.consume(key);
 				return null;
 			} catch (rejected) {
-				const retryAfter = Math.max(1, Math.ceil(((rejected as { msBeforeNext?: number }).msBeforeNext ?? 1000) / 1000));
-				const response = json({ success: false, error: 'rate limited', retry_after_seconds: retryAfter }, 429);
-				response.headers.set('Retry-After', String(retryAfter));
-				return response;
+				return tooMany((rejected as { msBeforeNext?: number }).msBeforeNext);
 			}
+		},
+		async check(key) {
+			const spent = await limiter.get(key);
+			return spent && spent.consumedPoints >= limit.points ? tooMany(spent.msBeforeNext) : null;
 		}
 	};
 }

@@ -106,10 +106,16 @@ model is documented in the epochcloud repo: keyless-signing.md.
 ## Public surface and timeouts
 
 The anonymous page reads a status snapshot that the server refreshes itself
-(`src/lib/server/snapshot.ts`, `checks.ts`): a visitor without a session cookie
-never causes an upstream call, and a check that did not run (not configured,
-unavailable until the platform offers a credential, no traffic yet) answers 200
-with `state: not-running`, never a 5xx. Every other route needs the app's own
+(`src/lib/server/snapshot.ts`, `checks.ts`): loading the page causes no upstream
+call, and a check that did not run (not configured, unavailable until the
+platform offers a credential, no traffic yet) answers 200 with
+`state: not-running`, never a 5xx. The four sign-in routes are anonymous on
+purpose: they take an email address and call BetterAuth for a visitor without a
+session, with the caller's address so BetterAuth's own limits count per visitor.
+They take form POSTs only, are limited per client address (IPv6 by /64), count
+only wrong passwords per account, and send at most one confirmation mail per
+inbox per 5 minutes, 3 a day and 60 an hour for the whole demo, counted in
+Valkey (`src/lib/server/signin.ts`). Every other route needs the app's own
 sign-in, decided once in the `handle` hook (`src/lib/server/access.ts`), is a
 form-encoded POST when it changes anything so SvelteKit's origin check always
 applies, and takes no address, topic or URL from the request; the cache routes
@@ -258,6 +264,8 @@ checks every route module against it.
 | `/status/<name>`                      | GET       | anonymous | The server's latest check of one integration                     |
 | `/auth/session`                       | GET       | anonymous | Who the server sees behind the session cookie                    |
 | `/api/faro/collect`                   | POST      | anonymous | Browser telemetry relay, size-capped and limited per client      |
+| `/auth/sign-in`, `/auth/sign-out`     | POST      | anonymous | Sign in or out at BetterAuth; sets or clears its session cookie  |
+| `/auth/sign-up`, `/auth/resend`       | POST      | anonymous | Create an account or resend its confirmation mail                |
 | `/email/send`                         | POST      | signed in | Test mail to the session's own address                           |
 | `/ntfy/send`, `/ntfy/topic`           | POST, GET | signed in | Test notification to the user's own topic, and that topic        |
 | `/rabbitmq/publish`                   | POST      | signed in | Publish a message to the queue                                   |
