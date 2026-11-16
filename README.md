@@ -238,6 +238,12 @@ on your machine, keyless-signs and SLSA-attests it, and pushes it to
 `epochcloud/<image>-dev`; the dev Kargo Warehouse auto-promotes it to the dev
 Stage. `bun run build` and `bun run dev` are local-only and never deploy.
 
+The `Dockerfile` runs every command (installs, lint, type checks, tests and the
+build) on the build machine's own platform and only copies into the
+linux/amd64 image, with production packages installed for the target by
+`bun install --cpu --os --libc`. So it builds on an arm64 machine with no
+emulated step, and the same file builds natively on amd64.
+
 ```bash
 deploy            # build + sign + push the dev image
 deploy --help     # required env, credentials, options
