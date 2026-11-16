@@ -16,11 +16,7 @@
 			class="demo-tab"
 			class:active={activeDemo === tab.id}
 			onclick={() => onSelect(tab.id)}
-			data-tip={tab.statusUrl
-				? entry.detail
-					? `${WORDS[entry.state]}: ${entry.detail}`
-					: WORDS[entry.state]
-				: undefined}
+			data-tip={tab.statusUrl ? (entry.detail ? `${WORDS[entry.state]}: ${entry.detail}` : WORDS[entry.state]) : undefined}
 		>
 			{#if tab.statusUrl}
 				<StatusIcon

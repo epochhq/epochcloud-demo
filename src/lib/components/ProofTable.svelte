@@ -48,7 +48,9 @@
 			{#each proofs as proof (proof.id)}
 				<tr>
 					<td class="state"
-						>{#if proof.state === 'info'}<span class="info">Reading</span>{:else if proof.state === 'nodata'}<span class="info">No data</span>{:else}<StatusIcon state={proof.state} />{/if}</td
+						>{#if proof.state === 'info'}<span class="info">Reading</span>{:else if proof.state === 'nodata'}<span class="info">No data</span>{:else}<StatusIcon
+								state={proof.state}
+							/>{/if}</td
 					>
 					<td>{proof.title}</td>
 					<td class="value">{format(proof.value, proof.unit)}</td>
