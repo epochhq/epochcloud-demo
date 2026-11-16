@@ -13,7 +13,7 @@ export const POST: RequestHandler = async ({ request, url, getClientAddress }) =
 	if (limited) return limited;
 	const email = address(field(await request.formData(), 'email'));
 	if (!email) return json({ success: false, error: 'enter a valid email address' }, 400);
-	const cooling = await claimMail(email);
+	const cooling = await claimMail(email, client);
 	if (cooling) return cooling;
 
 	try {

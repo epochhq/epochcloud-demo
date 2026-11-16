@@ -114,12 +114,13 @@ purpose: they take an email address and call BetterAuth for a visitor without a
 session, with the caller's address so BetterAuth's own limits count per visitor.
 They take form POSTs only, are limited per client address (IPv6 by /64), count
 only wrong passwords per account, and send at most one confirmation mail per
-inbox per 5 minutes, 3 a day and 60 an hour for the whole demo, counted in
-Valkey (`src/lib/server/signin.ts`). Every other route needs the app's own
-sign-in, decided once in the `handle` hook (`src/lib/server/access.ts`), is a
-form-encoded POST when it changes anything so SvelteKit's origin check always
-applies, and takes no address, topic or URL from the request; the cache routes
-take a key of up to 64 characters, always under the `demo:` prefix.
+inbox per 5 minutes and 3 a day, 3 an hour per client network and 60 an hour
+for the whole demo, counted in Valkey (`src/lib/server/signin.ts`). Every
+other route needs the app's own sign-in, decided once in the `handle` hook
+(`src/lib/server/access.ts`), is a form-encoded POST when it changes anything so
+SvelteKit's origin check always applies, and takes no address, topic or URL
+from the request; the cache routes take a key of up to 64 characters, always
+under the `demo:` prefix.
 
 Bun cuts a request that writes nothing for its idle timeout, and the app would
 still log 200 for it. The timeout is stated in `src/lib/limits.ts` at Bun's

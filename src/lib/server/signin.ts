@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { config } from './config.js';
 import { UPSTREAM_TIMEOUT_MS } from '../limits.js';
-import { isTimeout, json, upstream, withDeadline } from './http.js';
+import { addressKey, isTimeout, json, upstream, withDeadline } from './http.js';
 import { createLimiter } from './ratelimit.js';
 import { sharedBudget } from './valkey.js';
 
@@ -24,6 +24,8 @@ export const MAIL_COOLDOWN_SECONDS = 300;
 const mailCooldown = sharedBudget('mail-cooldown', 1, MAIL_COOLDOWN_SECONDS);
 /** Three per inbox a day: the sign-up mail and two resends cover a lost or late one. */
 const mailsPerInbox = sharedBudget('mail-inbox', 3, 24 * 60 * 60);
+/** Three an hour per client network (IPv6 by /64): one visitor's needs; emptying the hour takes 20 networks. */
+const mailsPerNetwork = sharedBudget('mail-client', 3, 60 * 60);
 /** Sixty an hour for the whole demo: far above its sign-ups, 1% of the platform relay's 6,000 an hour. */
 const mailsPerHour = sharedBudget('mail-hour', 60, 60 * 60);
 
@@ -61,28 +63,31 @@ export function inbox(email: string): string {
 }
 
 /**
- * Spends one confirmation mail of the inbox's and the hour's budgets, or says
+ * Spends one confirmation mail of the network's, the hour's and the inbox's budgets, or says
  * truthfully why none can be sent. The key is a digest, so no address is stored.
  */
-export async function claimMail(email: string): Promise<Response | null> {
+export async function claimMail(email: string, client: string): Promise<Response | null> {
 	const key = createHash('sha256').update(inbox(email)).digest('hex').slice(0, 32);
 	const refusals: Record<string, string> = {
 		cooldown: `a confirmation mail for this address was sent less than ${MAIL_COOLDOWN_SECONDS / 60} minutes ago`,
 		inbox: 'this address has had its confirmation mails for today',
+		network: 'your network has had its confirmation mails for this hour; try again later',
 		hour: 'the demo has sent all the confirmation mails it sends in an hour; try again later'
 	};
 	const spendAll = async (): Promise<string> => {
 		for (const [name, budget, budgetKey] of [
+			['network', mailsPerNetwork, addressKey(client)],
+			['hour', mailsPerHour, 'all'],
 			['cooldown', mailCooldown, key],
-			['inbox', mailsPerInbox, key],
-			['hour', mailsPerHour, 'all']
+			// Last, so a mail refused for any other reason costs the inbox none of its three.
+			['inbox', mailsPerInbox, key]
 		] as const) {
 			const result = await budget.take(budgetKey);
 			if (result !== 'ok') return result === 'limited' ? name : 'unavailable';
 		}
 		return 'ok';
 	};
-	// One deadline for all three Valkey calls keeps the handler's chain in HANDLER_WAITS.
+	// One deadline for all the Valkey calls keeps the handler's chain in HANDLER_WAITS.
 	const outcome = await withDeadline(spendAll(), UPSTREAM_TIMEOUT_MS, 'Valkey').catch(() => 'unavailable');
 	if (outcome === 'unavailable') return json({ success: false, error: 'confirmation mails cannot be sent right now; nothing was sent' }, 503);
 	if (outcome !== 'ok') return json({ success: false, error: refusals[outcome] }, 429);

@@ -18,7 +18,7 @@ export const POST: RequestHandler = async ({ request, url, getClientAddress }) =
 	if (!email) return json({ success: false, error: 'enter a valid email address' }, 400);
 	// BetterAuth's default password bounds, checked before the cooldown is spent.
 	if (password.length < 8 || password.length > 128) return json({ success: false, error: 'use a password of 8 to 128 characters' }, 400);
-	const cooling = await claimMail(email);
+	const cooling = await claimMail(email, client);
 	if (cooling) return cooling;
 
 	try {

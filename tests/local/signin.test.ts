@@ -8,6 +8,13 @@ const { budgets, valkey, config } = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/env/private', () => ({ PROMETHEUS_URL: '' }));
+vi.mock('node:os', async (importOriginal) => ({
+	...(await importOriginal<typeof import('node:os')>()),
+	networkInterfaces: () => ({
+		lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true }],
+		eth0: [{ address: '10.244.1.7', family: 'IPv4', internal: false }]
+	})
+}));
 vi.mock('#lib/server/config.js', () => ({ config }));
 vi.mock('#lib/server/logger.js', () => ({ log: vi.fn() }));
 vi.mock('#lib/server/valkey.js', () => ({
@@ -165,6 +172,25 @@ it('sends at most 60 confirmation mails an hour for the whole demo', async () =>
 	expect(calls).toHaveLength(60);
 });
 
+it("sends a client network at most 3 confirmation mails an hour, so one client cannot use up everyone's", async () => {
+	const statuses: number[] = [];
+	for (let i = 0; i < 4; i++) statuses.push((await post(resend, { email: `net${i}@example.test` }, `2001:db8:9:9::${i + 1}`)).status);
+	expect(statuses).toEqual([200, 200, 200, 429]);
+	expect((await post(resend, { email: 'net9@example.test' }, '2001:db8:9:a::1')).status).toBe(200);
+});
+
+it('costs an inbox none of its daily mails when a mail is refused for another reason', async () => {
+	for (let i = 0; i < 60; i++) await post(resend, { email: `filler${i}@example.test` }, `192.0.2.${i}`);
+	expect((await post(resend, { email: 'patient@example.test' }, '203.0.113.30')).status).toBe(429);
+	endWindow('mail-hour');
+	const statuses: number[] = [];
+	for (let i = 0; i < 3; i++) {
+		endWindow('mail-cooldown');
+		statuses.push((await post(resend, { email: 'patient@example.test' }, `203.0.113.${40 + i}`)).status);
+	}
+	expect(statuses).toEqual([200, 200, 200]);
+});
+
 it('sends nothing, and says so, when the mail budgets cannot be counted', async () => {
 	valkey.up = false;
 	for (const response of [await post(signUp, { email: 'z@example.test', password: 'long-enough' }), await post(resend, { email: 'z@example.test' })]) {
@@ -187,7 +213,8 @@ it('spends no mail budget on a sign-up that would be refused anyway', async () =
 it('limits sign-ups and resends per client address, an IPv6 /64 counting as one', async () => {
 	for (const handler of [signUp, resend]) {
 		const statuses: number[] = [];
-		for (let i = 0; i < 11; i++)
+		for (let i = 0; i < 11; i++) {
+			endWindow('mail-client');
 			statuses.push(
 				(
 					await post(
@@ -197,6 +224,7 @@ it('limits sign-ups and resends per client address, an IPv6 /64 counting as one'
 					)
 				).status
 			);
+		}
 		expect(statuses.slice(0, 10).every((status) => status === 200)).toBe(true);
 		expect(statuses[10]).toBe(429);
 	}
@@ -232,6 +260,11 @@ it('signs out at BetterAuth with the caller cookie and passes the clearing cooki
 	expect(response.headers.getSetCookie()).toEqual(['demo.session_token=; Max-Age=0']);
 });
 
+it('shows the Account check as not running, not failed, when BetterAuth turns it away under its rate limit', async () => {
+	betterAuth(() => Response.json({ message: 'Too many requests' }, { status: 429 }));
+	expect(await refresh('betterauth', 1_000, new AbortController().signal)).toMatchObject({ connected: false, state: 'not-running' });
+});
+
 it('passes the Account status check only when BetterAuth refuses an unknown sign-in from its database', async () => {
 	const signal = new AbortController().signal;
 	for (const [status, ok] of [
@@ -242,6 +275,6 @@ it('passes the Account status check only when BetterAuth refuses an unknown sign
 		betterAuth(() => Response.json({}, { status }));
 		expect((await refresh('betterauth', 1_000, signal)).connected, `HTTP ${status}`).toBe(ok);
 		expect(calls[0]!.path).toBe('/sign-in/email');
-		expect(calls[0]!.headers.get('x-forwarded-for')).toBe('127.0.0.1');
+		expect(calls[0]!.headers.get('x-forwarded-for'), 'the pod address, so each pod has its own bucket').toBe('10.244.1.7');
 	}
 });
