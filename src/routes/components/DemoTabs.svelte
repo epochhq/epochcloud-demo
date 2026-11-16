@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WORDS } from '#lib/check.js';
 	import StatusIcon from '#lib/components/StatusIcon.svelte';
 	import { DEMOS } from '#lib/demos.js';
 	import { getPage } from '#lib/status.svelte.js';
@@ -15,12 +16,16 @@
 			class="demo-tab"
 			class:active={activeDemo === tab.id}
 			onclick={() => onSelect(tab.id)}
-			title={entry.detail}
+			data-tip={tab.statusUrl
+				? entry.detail
+					? `${WORDS[entry.state]}: ${entry.detail}`
+					: WORDS[entry.state]
+				: undefined}
 		>
 			{#if tab.statusUrl}
 				<StatusIcon
 					state={entry.state}
-					showWord
+					tip={false}
 				/>
 			{/if}
 			{tab.label}

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import StatusIcon from './StatusIcon.svelte';
-	import { WORDS } from '#lib/check.js';
 	import { demo } from '#lib/demos.js';
 	import { getPage } from '#lib/status.svelte.js';
 
@@ -36,8 +35,6 @@
 		class="status-text"
 		role="status"
 	>
-		{#if entry.state === 'ok'}{entry.detail}{:else}<strong>{WORDS[entry.state]}</strong>{entry.detail
-				? ` - ${entry.detail}`
-				: ''}{/if}
+		{entry.detail}
 	</span>
 </div>
