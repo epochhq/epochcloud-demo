@@ -70,7 +70,6 @@
 			<h2 class="section-title">Live Demos</h2>
 			<span class="count-badge">{DEMOS.length}</span>
 		</div>
-		<p class="section-note">The in-app chaos demo is being replaced by a real LitmusChaos experiment.</p>
 
 		<DemoTabs
 			{activeDemo}
