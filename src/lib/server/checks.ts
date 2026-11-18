@@ -28,6 +28,9 @@ export function podAddress(): string {
 // Every integration the page reports on, as data. Each run proves its
 // capability against the real service: a round trip, a query, or a handshake.
 // Results carry no internal addresses; the page gets counts and words.
+/** The CrowdSec canary's period; see the check. */
+export const CANARY_EVERY_MS = 15 * 60_000;
+
 defineChecks([
 	{
 		name: 'rabbitmq',
@@ -69,6 +72,11 @@ defineChecks([
 		name: 'crowdsec',
 		enabled: edgeEnabled,
 		missing: 'No public address configured for this environment',
+		// fail2ban at the edge bans a sender address after ten refusals in ten
+		// minutes, and it counts the canary's. One canary per pod every fifteen
+		// minutes keeps every pod of every environment that shares one attributed
+		// sender address under that limit, whichever address Traefik attributes.
+		everyMs: CANARY_EVERY_MS,
 		run: async () => {
 			const probe = await probeEdge(config.entrypointUrl);
 			judgeEdge(probe);

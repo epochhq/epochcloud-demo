@@ -18,7 +18,7 @@ const attestationOnce = vi.hoisted(() => vi.fn());
 vi.mock('#lib/server/attestation.js', () => ({ attestationOnce }));
 
 import '../../src/lib/server/checks.js';
-import { refresh } from '../../src/lib/server/snapshot.js';
+import { refresh, tick } from '../../src/lib/server/snapshot.js';
 
 // How the three showcase checks turn what they read into a dot: the CrowdSec
 // canary, the signed vulnerability attestation and the chaos experiment.
@@ -108,4 +108,24 @@ it('Chaos: not running in an environment that ships no experiment', async () => 
 	config.chaos.enabled = false;
 	expect(await refresh('chaos', NOW)).toMatchObject({ connected: false, state: 'not-running' });
 	config.chaos.enabled = true;
+});
+
+it('CrowdSec: sends a canary at most once every fifteen minutes, so fail2ban never counts ten from one address', async () => {
+	let canaries = 0;
+	vi.stubGlobal('fetch', async (url: string, init: RequestInit = {}) => {
+		if (url.startsWith('http://prom.test')) return Response.json({ status: 'success', data: { result: [] } });
+		if (new globalThis.Headers(init.headers).has('x-epochcloud-edge-canary')) {
+			canaries++;
+			return new Response(null, { status: 403, headers: { 'x-crowdsec-remediation': 'ban' } });
+		}
+		return new Response('ok');
+	});
+	// The earlier cases ran the check at NOW; the first tick here is due.
+	const start = NOW + 20 * 60_000;
+	await tick(start);
+	expect(canaries).toBe(1);
+	await tick(start + 14 * 60_000);
+	expect(canaries).toBe(1);
+	await tick(start + 15 * 60_000);
+	expect(canaries).toBe(2);
 });
