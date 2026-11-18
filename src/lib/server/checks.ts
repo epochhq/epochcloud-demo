@@ -138,7 +138,12 @@ defineChecks([
 		run: async () => {
 			const namespace = currentNamespace();
 			if (!namespace) throw new Error('namespace unknown');
-			const probe = entrypointEnabled() ? probeEntrypoint().then(() => true, () => false) : Promise.resolve(undefined);
+			const probe = entrypointEnabled()
+				? probeEntrypoint().then(
+						() => true,
+						() => false
+					)
+				: Promise.resolve(undefined);
 			const [proofs, probed] = await Promise.all([evaluateProofs(namespace, 'linkerd'), probe]);
 			const mtls = proofs.find((proof) => proof.id === 'mtls-traefik');
 			const plaintext = proofs.find((proof) => proof.id === 'plaintext-traefik');
