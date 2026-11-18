@@ -150,6 +150,7 @@ The Prometheus and Linkerd tabs render a data array of namespace-limited queries
 | `NTFY_TOPIC_PREFIX`           | `epochcloud-demo`   | Prefix every published topic must start with          |
 | `FARO_RECEIVER_URL`           | _(relay disabled)_  | Collector the browser telemetry relay forwards to     |
 | `PROMETHEUS_URL`              | _(disabled)_        | Prometheus the proofs query                           |
+| `ENTRYPOINT_URL`              | _(no probe)_        | Public address the Linkerd check requests through Traefik |
 | `BETTERAUTH_URL`              | _(disabled)_        | BetterAuth server URL                                 |
 | `RYBBIT_SITE_ID`              |                     | Rybbit analytics site ID                              |
 | `RYBBIT_HOST`                 |                     | Rybbit analytics host                                 |

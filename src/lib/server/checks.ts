@@ -7,6 +7,7 @@ import { getRabbitStatus } from './rabbitmq.js';
 import { verifySmtp } from './smtp.js';
 import { pingValkey } from './valkey.js';
 import { currentNamespace } from './namespace.js';
+import { entrypointEnabled, probeEntrypoint } from './entrypoint.js';
 import { evaluateProofs } from './proofs.js';
 import { prometheusEnabled } from './prometheus.js';
 import { NotRunning, defineChecks } from './snapshot.js';
@@ -99,23 +100,33 @@ defineChecks([
 		// pass; the proxy drops an idle series and recreates it at 1, so existence
 		// is the evidence, not an increase. A series toward the app with any other
 		// tls is positive evidence that the entrypoint reached it without mTLS:
-		// Failed. No series is Not running: no request came yet. The server side of
-		// the app is deliberately not read: the proxies create default-policy
-		// series at start-up and other workloads share the port, so a plaintext
-		// series there says nothing about the entrypoint's traffic. 503 also when
-		// the queries do not answer.
+		// Failed. The server side of the app is deliberately not read: the proxies
+		// create default-policy series at start-up and other workloads share the
+		// port, so a plaintext series there says nothing about the entrypoint's
+		// traffic. 503 also when the queries do not answer.
+		//
+		// The evidence only exists while requests flow, so each run also sends one
+		// real request through the public entrypoint (src/lib/server/entrypoint.ts),
+		// beside the read. The read sees what earlier runs sent: a run a scrape
+		// interval after the request finds its series, so an idle demo keeps
+		// showing the mesh. Only the first run after a start can find nothing; it
+		// says the series is on its way, and a probe the entrypoint did not answer
+		// with no series to show is a failure of the path, not an idle app.
 		name: 'linkerd',
 		enabled: prometheusEnabled,
 		missing: 'Prometheus not configured',
 		run: async () => {
 			const namespace = currentNamespace();
 			if (!namespace) throw new Error('namespace unknown');
-			const proofs = await evaluateProofs(namespace, 'linkerd');
+			const probe = entrypointEnabled() ? probeEntrypoint().then(() => true, () => false) : Promise.resolve(undefined);
+			const [proofs, probed] = await Promise.all([evaluateProofs(namespace, 'linkerd'), probe]);
 			const mtls = proofs.find((proof) => proof.id === 'mtls-traefik');
 			const plaintext = proofs.find((proof) => proof.id === 'plaintext-traefik');
 			if (!mtls?.answered || !plaintext?.answered) throw new Error('Prometheus did not answer the mesh queries');
 			if (plaintext.value) throw new Error('Traefik reached the app without mTLS');
 			if (mtls.value) return { mtls_series_10m: Math.round(mtls.value) };
+			if (probed === false) throw new Error('The app got no answer from its own entrypoint');
+			if (probed) throw new NotRunning('Probed the entrypoint just now; its series reaches Prometheus with the next scrape');
 			throw new NotRunning('No request from Traefik to the app in the last 10 minutes');
 		}
 	},
