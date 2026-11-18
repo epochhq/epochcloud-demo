@@ -50,7 +50,6 @@
 					<td class="state"
 						>{#if proof.state === 'info'}<span class="info">Reading</span>{:else if proof.state === 'nodata'}<span class="info">No data</span>{:else}<StatusIcon
 								state={proof.state}
-								showWord
 							/>{/if}</td
 					>
 					<td>{proof.title}</td>

@@ -46,10 +46,14 @@ export const KNATIVE_WORST_CASE_MS = KNATIVE_ATTEMPTS * KNATIVE_ATTEMPT_MS + (KN
 const WITH_SESSION = SESSION_TIMEOUT_MS;
 
 /**
- * Every wait a signed-in handler can perform, in order. A new handler needs an
+ * Every wait a signed-in or sign-in handler can perform, in order. A new handler needs an
  * entry here, and the sum of its entry stays under CHAIN_CEILING_MS.
  */
 export const HANDLER_WAITS: Record<string, number[]> = {
+	'/auth/resend': [UPSTREAM_TIMEOUT_MS, UPSTREAM_TIMEOUT_MS],
+	'/auth/sign-in': [UPSTREAM_TIMEOUT_MS],
+	'/auth/sign-out': [UPSTREAM_TIMEOUT_MS],
+	'/auth/sign-up': [UPSTREAM_TIMEOUT_MS, UPSTREAM_TIMEOUT_MS],
 	'/cache/get': [WITH_SESSION, UPSTREAM_TIMEOUT_MS],
 	'/cache/set': [WITH_SESSION, UPSTREAM_TIMEOUT_MS],
 	'/cnpg/items': [WITH_SESSION, DB_DEADLINE_MS],

@@ -1,3 +1,4 @@
+import { networkInterfaces } from 'node:os';
 import { config } from './config.js';
 import { getCnpgStatus } from './cnpg.js';
 import { getDefectDojoSummary } from './defectdojo.js';
@@ -10,6 +11,16 @@ import { currentNamespace } from './namespace.js';
 import { evaluateProofs } from './proofs.js';
 import { prometheusEnabled } from './prometheus.js';
 import { NotRunning, defineChecks } from './snapshot.js';
+
+/**
+ * The address the Account check counts under in BetterAuth's per-address limit:
+ * this pod's own, so every pod that shares a BetterAuth has its own bucket.
+ */
+export function podAddress(): string {
+	for (const entries of Object.values(networkInterfaces()))
+		for (const entry of entries ?? []) if (entry.family === 'IPv4' && !entry.internal) return entry.address;
+	return '127.0.0.1';
+}
 
 // Every integration the page reports on, as data. Each run proves its
 // capability against the real service: a round trip, a query, or a handshake.
@@ -31,9 +42,18 @@ defineChecks([
 		name: 'betterauth',
 		enabled: () => config.betterauth.enabled,
 		missing: 'BetterAuth not configured',
+		// A sign-in for an address that cannot exist (the .invalid TLD, RFC 2606):
+		// BetterAuth refuses it with 401 only after looking it up in its database,
+		// so this passes only when signing in works end to end. A 429 is BetterAuth
+		// turning the check away, which tests nothing: the dot says not running.
 		run: async () => {
-			const resp = await upstream(`${config.betterauth.url}/ready`);
-			if (!resp.ok) throw new Error(`BetterAuth answered ${resp.status}`);
+			const resp = await upstream(`${config.betterauth.url}/api/auth/sign-in/email`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', 'x-forwarded-for': podAddress() },
+				body: JSON.stringify({ email: 'status-check@example.invalid', password: 'status-check-password' })
+			});
+			if (resp.status === 429) throw new NotRunning('BetterAuth turned this check away under its rate limit, so sign-in was not tested this time');
+			if (resp.status !== 401) throw new Error(`a sign-in attempt got HTTP ${resp.status}, not the refusal it expects`);
 		}
 	},
 	{

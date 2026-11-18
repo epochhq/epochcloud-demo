@@ -9,7 +9,8 @@ import { initDefectDojo } from '#lib/server/defectdojo.js';
 import { initSmtp } from '#lib/server/smtp.js';
 import '#lib/server/checks.js';
 import { startSnapshots } from '#lib/server/snapshot.js';
-import { authorize } from '#lib/server/access.js';
+import { authorize, SIGN_IN_ROUTES } from '#lib/server/access.js';
+import { clientAddress } from '#lib/server/http.js';
 
 // --- Initialization (runs once on server start) ---
 
@@ -84,6 +85,7 @@ const METRIC_PATHS = [
 	'/features/evaluate',
 	'/prometheus/increment',
 	'/auth/session',
+	...SIGN_IN_ROUTES,
 	'/api/faro/collect'
 ];
 
@@ -133,13 +135,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	// Sign-in, the form-POST rule and the per-user limit for every route that is
 	// not on the anonymous list (src/lib/server/access.ts).
-	let client = 'unknown';
-	try {
-		client = event.getClientAddress();
-	} catch {
-		// no address behind this connection: one shared bucket
-	}
-	const access = await authorize(event.request, pathname, client);
+	const access = await authorize(event.request, pathname, clientAddress(event.getClientAddress));
 	if ('refusal' in access) return withSecurityHeaders(access.refusal);
 	if (access.session) event.locals.session = access.session;
 
