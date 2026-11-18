@@ -169,6 +169,7 @@ export SIGSTORE_REFRESH_TOKEN
 # endpoints are the PUBLIC dev ingress; the OIDC issuer is the signing realm, which
 # is also the realm the identity is refreshed at.
 export REGISTRY_PASSWORD="$HARBOR_DEV_ROBOT_TOKEN"
+export EPOCHCLOUD_TREE_STATUS="$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesFile GIT_CONFIG_VALUE_0=/dev/null git status --porcelain=v2 --branch --untracked-files=all --ignore-submodules=none -- "$BUILD_CONTEXT_ABS")"
 
 # The buildah layer graph lives on a named podman volume so the step cache
 # survives across deploys: an unchanged Dockerfile step is a cache hit, and a
@@ -179,6 +180,7 @@ exec podman run --rm --pull=newer --privileged \
     -e REGISTRY_USERNAME="$HARBOR_DEV_ROBOT_USER" \
     -e REGISTRY_PASSWORD \
     -e SIGSTORE_REFRESH_TOKEN \
+    -e EPOCHCLOUD_TREE_STATUS \
     -v "${BUILD_CONTEXT_ABS}:/src:ro" \
     -v epochcloud-buildah-cache:/var/cache/epochcloud-buildah \
     --entrypoint /ci-tools \

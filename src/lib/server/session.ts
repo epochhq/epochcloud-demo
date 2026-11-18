@@ -16,13 +16,17 @@ export function hasSessionCookie(request: Request): boolean {
  * The BetterAuth session behind the request's cookies, or null. This is the one
  * function the app asks who is signed in; the login behind it is replaceable.
  * With no session cookie there is nothing to look up, so a visitor without one
- * never causes an upstream call.
+ * never causes an upstream call. BetterAuth limits lookups per caller address,
+ * so the caller's address goes with every lookup: without it all callers share
+ * one bucket that anyone can fill. A refusal (a 429 or 5xx) throws, because it
+ * says nothing about whether the visitor is signed in.
  */
-export async function getSession(request: Request): Promise<Session | null> {
+export async function getSession(request: Request, client: string): Promise<Session | null> {
 	if (!config.betterauth.enabled || !hasSessionCookie(request)) return null;
 	const cookie = request.headers.get('cookie') ?? '';
-	const resp = await upstream(`${config.betterauth.url}/api/auth/get-session`, { headers: { cookie } }, SESSION_TIMEOUT_MS);
-	if (!resp.ok) return null;
+	const resp = await upstream(`${config.betterauth.url}/api/auth/get-session`, { headers: { cookie, 'x-forwarded-for': client } }, SESSION_TIMEOUT_MS);
+	if (resp.status === 401) return null;
+	if (!resp.ok) throw new Error(`the session lookup got HTTP ${resp.status}`);
 	const body = (await resp.json().catch(() => null)) as { user?: Record<string, unknown>; session?: Record<string, unknown> } | null;
 	const user = body?.user;
 	const session = body?.session;

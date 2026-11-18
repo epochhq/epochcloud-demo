@@ -30,7 +30,7 @@
 	let activeDemo = $state('rabbitmq');
 	const board = new StatusBoard();
 	const account = new AccountState();
-	setPage({ board, account });
+	setPage({ board, account, open: (id) => (activeDemo = id) });
 
 	// Every tab with a check is checked once when the page opens; the panels
 	// reuse the result instead of repeating the call.

@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { UPSTREAM_TIMEOUT_MS } from '../limits.js';
 
 /** A JSON answer. Every endpoint answers JSON, also for failure and timeout. */
@@ -13,6 +14,34 @@ export function isTimeout(err: unknown): boolean {
 /** Call an upstream with a deadline below the server's idle timeout. */
 export function upstream(url: string, init: RequestInit = {}, timeoutMs = UPSTREAM_TIMEOUT_MS): Promise<Response> {
 	return fetch(url, { ...init, signal: init.signal ?? AbortSignal.timeout(timeoutMs) });
+}
+
+/** The caller's address for per-address limits; a connection without one shares one bucket. */
+export function clientAddress(getClientAddress: () => string): string {
+	try {
+		return getClientAddress();
+	} catch {
+		return 'unknown';
+	}
+}
+
+/**
+ * What a per-address limit counts under: an IPv4 address as it is, an IPv6
+ * address by its /64, the block one subscriber usually holds, as BetterAuth counts.
+ */
+export function addressKey(address: string): string {
+	if (isIP(address) !== 6) return address;
+	const lower = address.toLowerCase();
+	const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(lower);
+	if (mapped) return mapped[1]!;
+	const [head = '', tail = ''] = lower.split('::');
+	const left = head ? head.split(':') : [];
+	const right = lower.includes('::') && tail ? tail.split(':') : [];
+	const groups = [...left, ...Array<string>(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right];
+	return `${groups
+		.slice(0, 4)
+		.map((group) => group.padStart(4, '0'))
+		.join(':')}::/64`;
 }
 
 /** A text field of a form body; anything else (absent, a file) reads as the fallback. */

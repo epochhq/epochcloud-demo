@@ -106,14 +106,21 @@ model is documented in the epochcloud repo: keyless-signing.md.
 ## Public surface and timeouts
 
 The anonymous page reads a status snapshot that the server refreshes itself
-(`src/lib/server/snapshot.ts`, `checks.ts`): a visitor without a session cookie
-never causes an upstream call, and a check that did not run (not configured,
-unavailable until the platform offers a credential, no traffic yet) answers 200
-with `state: not-running`, never a 5xx. Every other route needs the app's own
-sign-in, decided once in the `handle` hook (`src/lib/server/access.ts`), is a
-form-encoded POST when it changes anything so SvelteKit's origin check always
-applies, and takes no address, topic or URL from the request; the cache routes
-take a key of up to 64 characters, always under the `demo:` prefix.
+(`src/lib/server/snapshot.ts`, `checks.ts`): loading the page causes no upstream
+call, and a check that did not run (not configured, unavailable until the
+platform offers a credential, no traffic yet) answers 200 with
+`state: not-running`, never a 5xx. The four sign-in routes are anonymous on
+purpose: they take an email address and call BetterAuth for a visitor without a
+session, with the caller's address so BetterAuth's own limits count per visitor.
+They take form POSTs only, are limited per client address (IPv6 by /64), count
+only wrong passwords per account, and send at most one confirmation mail per
+inbox per 5 minutes and 3 a day, 3 an hour per client network and 60 an hour
+for the whole demo, counted in Valkey (`src/lib/server/signin.ts`). Every
+other route needs the app's own sign-in, decided once in the `handle` hook
+(`src/lib/server/access.ts`), is a form-encoded POST when it changes anything so
+SvelteKit's origin check always applies, and takes no address, topic or URL
+from the request; the cache routes take a key of up to 64 characters, always
+under the `demo:` prefix.
 
 Bun cuts a request that writes nothing for its idle timeout, and the app would
 still log 200 for it. The timeout is stated in `src/lib/limits.ts` at Bun's
@@ -232,6 +239,12 @@ on your machine, keyless-signs and SLSA-attests it, and pushes it to
 `epochcloud/<image>-dev`; the dev Kargo Warehouse auto-promotes it to the dev
 Stage. `bun run build` and `bun run dev` are local-only and never deploy.
 
+The `Dockerfile` runs every command (installs, lint, type checks, tests and the
+build) on the build machine's own platform and only copies into the
+linux/amd64 image, with production packages installed for the target by
+`bun install --cpu --os --libc`. So it builds on an arm64 machine with no
+emulated step, and the same file builds natively on amd64.
+
 ```bash
 deploy            # build + sign + push the dev image
 deploy --help     # required env, credentials, options
@@ -259,6 +272,8 @@ checks every route module against it.
 | `/status/<name>`                      | GET       | anonymous | The server's latest check of one integration                     |
 | `/auth/session`                       | GET       | anonymous | Who the server sees behind the session cookie                    |
 | `/api/faro/collect`                   | POST      | anonymous | Browser telemetry relay, size-capped and limited per client      |
+| `/auth/sign-in`, `/auth/sign-out`     | POST      | anonymous | Sign in or out at BetterAuth; sets or clears its session cookie  |
+| `/auth/sign-up`, `/auth/resend`       | POST      | anonymous | Create an account or resend its confirmation mail                |
 | `/email/send`                         | POST      | signed in | Test mail to the session's own address                           |
 | `/ntfy/send`, `/ntfy/topic`           | POST, GET | signed in | Test notification to the user's own topic, and that topic        |
 | `/rabbitmq/publish`                   | POST      | signed in | Publish a message to the queue                                   |

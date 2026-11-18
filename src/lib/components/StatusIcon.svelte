@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { WORDS, type CheckState } from '#lib/check.js';
 
-	// Each state has its own shape as well as its own colour, so the state never
-	// depends on colour alone (WCAG 2.2 SC 1.4.1). The word is shown by the
-	// caller or, with `showWord`, by this component.
-	let { state, showWord = false }: { state: CheckState; showWord?: boolean } = $props();
+	// A state is a dot: filled green, amber or red for OK, slow and failed, a
+	// grey ring for not running, a dashed grey ring for not checked, and a
+	// spinner while checking. The state's word is never shown: it is the
+	// tooltip above the dot on hover (unless the caller shows one of its own,
+	// `tip={false}`) and is read by assistive technology.
+	let { state, tip = true }: { state: CheckState; tip?: boolean } = $props();
 </script>
 
 <span
 	class="status-icon {state}"
-	title={WORDS[state]}
+	data-tip={tip ? WORDS[state] : undefined}
 >
 	<svg
 		viewBox="0 0 16 16"
@@ -20,19 +22,20 @@
 		stroke-linecap="round"
 		stroke-linejoin="round"
 	>
-		{#if state === 'ok'}
-			<path d="M3 8.5l3.2 3.2L13 4.8" />
-		{:else if state === 'failed'}
-			<path d="M4 4l8 8M12 4l-8 8" />
-		{:else if state === 'notrunning'}
-			<path d="M4 8h8" />
-		{:else if state === 'slow'}
+		{#if state === 'ok' || state === 'slow' || state === 'failed'}
 			<circle
 				cx="8"
 				cy="8"
-				r="5.5"
+				r="4"
+				fill="currentColor"
+				stroke="none"
 			/>
-			<path d="M8 4.8V8l2.2 1.4" />
+		{:else if state === 'notrunning'}
+			<circle
+				cx="8"
+				cy="8"
+				r="3.2"
+			/>
 		{:else if state === 'checking'}
 			<path
 				class="spinner"
@@ -42,19 +45,18 @@
 			<circle
 				cx="8"
 				cy="8"
-				r="5.5"
+				r="3.2"
 				stroke-dasharray="2 2.6"
 			/>
 		{/if}
 	</svg>
-	{#if showWord}<span class="word">{WORDS[state]}</span>{/if}
+	<span class="sr-only">{WORDS[state]}</span>
 </span>
 
 <style>
 	.status-icon {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.25rem;
 		flex-shrink: 0;
 		color: var(--muted-fg);
 	}
@@ -64,13 +66,12 @@
 		height: 14px;
 	}
 
-	.word {
-		font-size: 0.7rem;
-		font-weight: 600;
-	}
-
 	.ok {
 		color: var(--success);
+	}
+
+	.ok svg {
+		filter: drop-shadow(0 0 3px rgba(34, 197, 94, 0.45));
 	}
 
 	.slow {
@@ -79,6 +80,15 @@
 
 	.failed {
 		color: var(--danger);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	.spinner {

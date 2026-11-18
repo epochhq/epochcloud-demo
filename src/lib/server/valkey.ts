@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
 import { config } from './config.js';
 import { log } from './logger.js';
 import { UPSTREAM_TIMEOUT_MS } from '../limits.js';
@@ -101,6 +102,34 @@ export async function claimCooldown(key: string, seconds: number): Promise<boole
 	} catch {
 		return false;
 	}
+}
+
+export type Spend = 'ok' | 'limited' | 'unavailable';
+
+/**
+ * A budget all pods share, counted in Valkey. It refuses ('unavailable') when
+ * it cannot count, so a missing Valkey never means an unlimited budget.
+ */
+export function sharedBudget(name: string, points: number, durationSeconds: number): { take(key: string): Promise<Spend> } {
+	let limiter: RateLimiterRedis | null = null;
+	return {
+		async take(key) {
+			if (!client) return 'unavailable';
+			limiter ??= new RateLimiterRedis({
+				storeClient: client,
+				keyPrefix: `demo:budget:${name}`,
+				points,
+				duration: durationSeconds,
+				rejectIfRedisNotReady: true
+			});
+			try {
+				await limiter.consume(key);
+				return 'ok';
+			} catch (rejected) {
+				return rejected instanceof RateLimiterRes ? 'limited' : 'unavailable';
+			}
+		}
+	};
 }
 
 export async function closeValkey(): Promise<void> {
