@@ -112,20 +112,6 @@ export const cnpgErrors = new client.Counter({
 	registers: [registry]
 });
 
-// DefectDojo metrics
-export const defectdojoRequests = new client.Counter({
-	name: 'epochcloud_defectdojo_api_requests_total',
-	help: 'Total DefectDojo API requests',
-	labelNames: ['endpoint', 'status'] as const,
-	registers: [registry]
-});
-
-export const defectdojoConnected = new client.Gauge({
-	name: 'epochcloud_defectdojo_connected',
-	help: 'DefectDojo connection status (1=connected, 0=disconnected)',
-	registers: [registry]
-});
-
 // Email metrics
 export const emailsSentTotal = new client.Counter({
 	name: 'epochcloud_emails_sent_total',

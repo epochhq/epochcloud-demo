@@ -17,13 +17,14 @@ export const load: PageServerLoad = async ({ url }) => {
 			rabbitmq: config.rabbitmq.enabled,
 			valkey: config.valkey.enabled,
 			cnpg: config.cnpg.enabled,
-			defectdojo: config.defectdojo.enabled,
+			vulnerabilities: config.attestation.enabled,
+			chaos: config.chaos.enabled,
 			smtp: config.smtp.enabled,
 			betterauth: config.betterauth.enabled,
 			gofeatureflag: config.gofeatureflag.enabled,
 			ntfy: config.ntfy.enabled,
 			knative: config.knative.enabled,
-			crowdsec: config.crowdsec.enabled
+			crowdsec: !!config.entrypointUrl
 		},
 		faro: config.faro.enabled
 	};

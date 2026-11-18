@@ -15,13 +15,23 @@ export const DEMOS: DemoTab[] = [
 	{ id: 'cnpg', label: 'CNPG', statusUrl: '/status/cnpg', describe: (d) => `Query answered, ${n(d.items)} items` },
 	{ id: 'email', label: 'Email', statusUrl: '/status/email', describe: () => 'Mail relay accepted the SMTP handshake' },
 	{ id: 'betterauth', label: 'Account', statusUrl: '/status/betterauth', describe: () => 'BetterAuth checked a sign-in against its database' },
-	{ id: 'crowdsec', label: 'CrowdSec', statusUrl: '/status/crowdsec', describe: () => 'LAPI accepted the bouncer key' },
 	{
-		id: 'defectdojo',
-		label: 'DefectDojo',
-		statusUrl: '/status/defectdojo',
-		describe: (d) =>
-			`${n((d.findings as { total?: number } | undefined)?.total)} active findings in ${typeof d.product === 'string' ? d.product : 'the demo product'}`
+		id: 'crowdsec',
+		label: 'CrowdSec',
+		statusUrl: '/status/crowdsec',
+		describe: () => 'The edge refused the canary request and served the control'
+	},
+	{
+		id: 'vulnerabilities',
+		label: 'Vulnerabilities',
+		statusUrl: '/status/vulnerabilities',
+		describe: (d) => `Signed scan of the running image: ${n(d.critical)} critical, ${n(d.high)} high`
+	},
+	{
+		id: 'chaos',
+		label: 'Chaos',
+		statusUrl: '/status/chaos',
+		describe: (d) => `Pod deleted, ${n(d.replacement_pods)} replacement created, ${n(d.probe_success_percentage)}% of probes answered`
 	},
 	{
 		id: 'prometheus',

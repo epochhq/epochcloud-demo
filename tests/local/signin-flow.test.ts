@@ -27,7 +27,6 @@ vi.mock('#lib/server/valkey.js', () => {
 	return { initValkey: vi.fn(), closeValkey: vi.fn(), sharedBudget };
 });
 vi.mock('#lib/server/cnpg.js', () => ({ initCnpg: vi.fn(), closeCnpg: vi.fn() }));
-vi.mock('#lib/server/defectdojo.js', () => ({ initDefectDojo: vi.fn() }));
 vi.mock('#lib/server/smtp.js', () => ({ initSmtp: vi.fn() }));
 vi.mock('#lib/server/checks.js', () => ({}));
 vi.mock('#lib/server/snapshot.js', () => ({ startSnapshots: vi.fn() }));

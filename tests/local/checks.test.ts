@@ -8,7 +8,6 @@ vi.mock('#lib/server/valkey.js', () => ({ pingValkey: vi.fn() }));
 vi.mock('#lib/server/cnpg.js', () => ({ getCnpgStatus: vi.fn() }));
 vi.mock('#lib/server/smtp.js', () => ({ verifySmtp: vi.fn() }));
 vi.mock('#lib/server/knative.js', () => ({ invokeFibonacci: vi.fn() }));
-vi.mock('#lib/server/defectdojo.js', () => ({ getDefectDojoSummary: vi.fn() }));
 
 import '../../src/lib/server/checks.js';
 import { refresh, snapshotResponse } from '../../src/lib/server/snapshot.js';

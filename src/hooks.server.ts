@@ -5,7 +5,6 @@ import { appInfo, httpRequestsTotal, httpRequestDuration, activeRequests } from 
 import { closeRabbit, initRabbitMQ } from '#lib/server/rabbitmq.js';
 import { closeValkey, initValkey } from '#lib/server/valkey.js';
 import { closeCnpg, initCnpg } from '#lib/server/cnpg.js';
-import { initDefectDojo } from '#lib/server/defectdojo.js';
 import { initSmtp } from '#lib/server/smtp.js';
 import '#lib/server/checks.js';
 import { startSnapshots } from '#lib/server/snapshot.js';
@@ -47,7 +46,6 @@ async function init() {
 	await initRabbitMQ();
 	await initValkey();
 	await initCnpg();
-	void initDefectDojo();
 	initSmtp();
 	if (!config.consumerMode) startSnapshots();
 
