@@ -218,7 +218,7 @@ it('sends a request through the entrypoint on every run, and says so when the se
 	expect(await response.json()).toMatchObject({ connected: false, state: 'not-running', reason: expect.stringContaining('Probed the entrypoint just now') });
 });
 
-it('is connected on an idle demo from the second run, on the series the first run's request created', async () => {
+it('is connected on an idle demo from the second run, on the series the request of the first run created', async () => {
 	config.entrypointUrl = ENTRYPOINT;
 	// The proxy recreates the series on the request; the scrape publishes it before the next run.
 	const world = idleWorld(() => new Response('{}'), [toApp()]);
