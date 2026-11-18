@@ -26,5 +26,6 @@ export const variables = defineEnvVars({
 	CROWDSEC_LAPI_URL: optional,
 	FARO_ENABLED: optional,
 	FARO_RECEIVER_URL: optional,
-	PROMETHEUS_URL: optional
+	PROMETHEUS_URL: optional,
+	ENTRYPOINT_URL: optional
 });

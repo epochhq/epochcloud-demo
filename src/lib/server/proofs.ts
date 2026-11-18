@@ -74,7 +74,7 @@ export const PROOFS: Proof[] = [
 		// is not in the figure.
 		id: 'entrypoint-requests',
 		group: 'linkerd',
-		title: 'Requests that came through the entrypoint in the last 10 minutes',
+		title: "Requests that came through the entrypoint in the last 10 minutes (the app's own health probe included)",
 		query: 'sum(increase(traefik_service_requests_total{exported_service=~"NSNAME-epochcloud-demo(-canary)?-80@kubernetescrd"}[10m])) or vector(0)',
 		unit: 'requests',
 		traffic: true
