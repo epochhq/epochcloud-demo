@@ -61,7 +61,8 @@ interface InTotoStatement {
 	};
 }
 
-const subjectIs = (statement: InTotoStatement, digest: string): boolean => !!statement.subject?.some((subject) => `sha256:${subject.digest?.sha256}` === digest);
+const subjectIs = (statement: InTotoStatement, digest: string): boolean =>
+	!!statement.subject?.some((subject) => `sha256:${subject.digest?.sha256}` === digest);
 
 /** The statement a verified bundle carries, checked against the running digest, as counts. */
 export function summarise(statement: InTotoStatement, digest: string, signer: string): VulnSummary {
@@ -191,7 +192,8 @@ export async function readVulnerabilityAttestation(): Promise<VulnSummary> {
 	for (const bundle of scans) {
 		try {
 			const { signer, statement } = await verifyBundle(bundle);
-			if (!trusted.some((who) => who.issuer === signer.issuer && who.subject === signer.subject)) throw new Error('the scan is not signed by the identity that signed the image');
+			if (!trusted.some((who) => who.issuer === signer.issuer && who.subject === signer.subject))
+				throw new Error('the scan is not signed by the identity that signed the image');
 			verified.push(summarise(statement, image.digest, signer.subject));
 		} catch (err) {
 			failure = err;
