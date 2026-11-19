@@ -86,8 +86,8 @@ const SLSA = 'https://slsa.dev/provenance/v1';
 
 interface Served {
 	predicate: string;
-	/** Who the stand-in verification says signed it; absent means the signature does not verify. */
-	signer?: { issuer: string; subject: string };
+	/** Who the stand-in verification says signed it; null means the signature does not verify. */
+	signer: { issuer: string; subject: string } | null;
 	payload: unknown;
 }
 
@@ -129,7 +129,7 @@ function registry(list: Served[]) {
 		const blob = /\/blobs\/sha256:blob(\d+)$/.exec(url.pathname);
 		if (blob) {
 			const b = list[Number(blob[1])]!;
-			return Response.json({ ...bundle(b.payload), signedBy: b.signer });
+			return Response.json({ ...bundle(b.payload), signedBy: b.signer ?? undefined });
 		}
 		return new Response(null, { status: 404 });
 	});
@@ -166,7 +166,7 @@ it('is not scanned, and says so, when the digest has no vulnerability attestatio
 });
 
 it('fails a scan whose signature does not verify', async () => {
-	registry([served(SLSA, provenance()), served(VULN, statement(), undefined)]);
+	registry([served(SLSA, provenance()), served(VULN, statement(), null)]);
 	await expect(readVulnerabilityAttestation()).rejects.toThrow('no vulnerability attestation of the running digest verified');
 });
 
@@ -189,7 +189,7 @@ it('accepts a scan signed by a developer when the developer signed the image, so
 it('has no one to trust when the digest has no verifiable provenance', async () => {
 	registry([served(VULN, statement())]);
 	await expect(readVulnerabilityAttestation()).rejects.toThrow('no verifiable provenance');
-	registry([served(SLSA, provenance(), undefined), served(VULN, statement())]);
+	registry([served(SLSA, provenance(), null), served(VULN, statement())]);
 	await expect(readVulnerabilityAttestation()).rejects.toThrow('no verifiable provenance');
 });
 
