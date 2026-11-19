@@ -16,7 +16,6 @@ const config = vi.hoisted(() => ({
 		tufMirrorUrl: 'http://tuf.test',
 		tufRootFile: '/etc/root.json',
 		cacheDir: '/tmp/x',
-		signers: '',
 		maxAgeDays: 30,
 		enabled: true
 	}
@@ -26,23 +25,13 @@ vi.mock('#lib/server/logger.js', () => ({ log: vi.fn() }));
 const verify = vi.hoisted(() => vi.fn());
 vi.mock('sigstore', () => ({ verify }));
 
-import {
-	attestationOnce,
-	credentialFor,
-	parseImageRef,
-	parseSigners,
-	readVulnerabilityAttestation,
-	resetAttestation,
-	summarise
-} from '../../src/lib/server/attestation.js';
+import { attestationOnce, credentialFor, parseImageRef, readVulnerabilityAttestation, resetAttestation, summarise } from '../../src/lib/server/attestation.js';
 
-const CI = { issuer: 'https://auth.example.test/realms/platform', subject: 'ci@example.test' };
-const DEV = { issuer: 'https://auth.example.test/realms/app', subjectDomain: 'example.test' };
+const CI = { issuer: 'https://auth.example.test/realms/one', subject: 'ci@example.test' };
 
 beforeEach(() => {
 	config.attestation.imageRef = REF;
 	config.attestation.authFile = authFile;
-	config.attestation.signers = JSON.stringify([CI, DEV]);
 	resetAttestation();
 	verify.mockReset();
 });
@@ -69,13 +58,6 @@ it('reads the digest the Rollout names', () => {
 	expect(() => parseImageRef('registry.example.test/epochcloud/demo:latest')).toThrow('not named by digest');
 });
 
-it('refuses a signer list that names nobody precisely', () => {
-	expect(parseSigners(JSON.stringify([CI, DEV]))).toHaveLength(2);
-	expect(() => parseSigners('{}')).toThrow('not a list');
-	expect(() => parseSigners(JSON.stringify([{ issuer: 'x' }]))).toThrow('needs an issuer');
-	expect(() => parseSigners(JSON.stringify([{ subject: 'x' }]))).toThrow('needs an issuer');
-});
-
 it('takes the credential for the registry, and refuses a pull secret without one', () => {
 	expect(credentialFor(JSON.stringify({ auths: { 'registry.example.test': { auth: 'abc' } } }), 'registry.example.test')).toBe('abc');
 	expect(() => credentialFor(JSON.stringify({ auths: { 'other.test': { auth: 'abc' } } }), 'registry.example.test')).toThrow('no credential');
@@ -99,8 +81,26 @@ it('refuses an attestation of another digest, of another kind, or without a scan
 	expect(() => summarise(statement({ predicate: {} }) as never, DIGEST, 's')).toThrow('no scan result');
 });
 
+const VULN = 'https://cosign.sigstore.dev/attestation/vuln/v1';
+const SLSA = 'https://slsa.dev/provenance/v1';
+
+interface Served {
+	predicate: string;
+	/** Who the stand-in verification says signed it; absent means the signature does not verify. */
+	signer?: { issuer: string; subject: string };
+	payload: unknown;
+}
+
+/** A bundle as the registry stores it: the envelope, with a marker the stand-in verification reads the signer from. */
+const served = (predicate: string, payload: unknown, signer: Served['signer'] = CI): Served => ({ predicate, payload, signer });
+const provenance = (digestHex = 'a'.repeat(64)) => ({
+	predicateType: SLSA,
+	subject: [{ digest: { sha256: digestHex } }],
+	predicate: {}
+});
+
 /** A registry that serves the referrers of the running digest with the Docker token flow. */
-function registry(bundles: Array<{ annotations?: Record<string, string>; artifactType?: string; body: unknown }>) {
+function registry(list: Served[]) {
 	const calls: string[] = [];
 	vi.stubGlobal('fetch', async (input: string, init: RequestInit = {}) => {
 		const url = new globalThis.URL(input);
@@ -118,98 +118,94 @@ function registry(bundles: Array<{ annotations?: Record<string, string>; artifac
 			});
 		if (url.pathname.endsWith(`/referrers/${DIGEST}`))
 			return Response.json({
-				manifests: bundles.map((b, i) => ({
+				manifests: list.map((b, i) => ({
 					digest: `sha256:${String(i).padStart(64, '0')}`,
-					artifactType: b.artifactType ?? 'application/vnd.dev.sigstore.bundle.v0.3+json',
-					annotations: b.annotations ?? { 'dev.sigstore.bundle.predicateType': 'https://cosign.sigstore.dev/attestation/vuln/v1' }
+					artifactType: 'application/vnd.dev.sigstore.bundle.v0.3+json',
+					annotations: { 'dev.sigstore.bundle.predicateType': b.predicate }
 				}))
 			});
 		const manifest = /\/manifests\/sha256:(\d+)$/.exec(url.pathname);
 		if (manifest) return Response.json({ layers: [{ digest: `sha256:blob${Number(manifest[1])}` }] });
 		const blob = /\/blobs\/sha256:blob(\d+)$/.exec(url.pathname);
-		if (blob) return Response.json(bundles[Number(blob[1])]!.body);
+		if (blob) {
+			const b = list[Number(blob[1])]!;
+			return Response.json({ ...bundle(b.payload), signedBy: b.signer });
+		}
 		return new Response(null, { status: 404 });
 	});
 	return calls;
 }
 
-// A certificate is issued under one issuer, and the real verification checks it
-// against the issuer it is asked for, so the stand-in verifies only for that one.
-const verified = (subject: string, issuer = CI.issuer) =>
-	verify.mockImplementation(async (_bundle: unknown, options: { certificateIssuer: string }) =>
-		options.certificateIssuer === issuer
-			? { key: {}, identity: { subjectAlternativeName: subject, extensions: { issuer } } }
-			: Promise.reject(new Error('another issuer'))
-	);
+// The stand-in for sigstore's verification: it verifies a bundle that has a
+// signer and reports who, and rejects one that has none. The real verification
+// is the platform trust root's to do (prototyped against a production digest).
+beforeEach(() => {
+	verify.mockImplementation(async (b: { signedBy?: { issuer: string; subject: string } }) => {
+		if (!b.signedBy) throw new Error('invalid signature');
+		return { key: {}, identity: { subjectAlternativeName: b.signedBy.subject, extensions: { issuer: b.signedBy.issuer } } };
+	});
+});
 
-it('reads the vulnerability attestation of the running digest through the token flow and verifies it', async () => {
-	const calls = registry([{ body: bundle(statement()) }]);
-	verified('ci@example.test');
+it('reads the scan of the running digest through the token flow, verifies it and the provenance, and reports its signer', async () => {
+	const calls = registry([served(SLSA, provenance()), served(VULN, statement())]);
 	const summary = await readVulnerabilityAttestation();
 	expect(summary).toMatchObject({ critical: 1, high: 2, signer: 'ci@example.test' });
-	// Only the vulnerability bundles of the running digest are fetched.
 	expect(calls.some((call) => call.includes(`/referrers/${DIGEST}`))).toBe(true);
-	// Verified against the platform trust root, pinned by the chart's root.json, for the issuer.
+	// Verified against the platform trust root, pinned by the chart's root.json; no signer is named.
 	expect(verify).toHaveBeenCalledWith(expect.anything(), {
 		tufMirrorURL: 'http://tuf.test',
 		tufRootPath: '/etc/root.json',
 		tufCachePath: '/tmp/x',
-		certificateIssuer: CI.issuer,
 		ctLogThreshold: 0
 	});
 });
 
 it('is not scanned, and says so, when the digest has no vulnerability attestation', async () => {
-	registry([
-		{
-			artifactType: 'application/vnd.dev.sigstore.bundle.v0.3+json',
-			annotations: { 'dev.sigstore.bundle.predicateType': 'https://slsa.dev/provenance/v1' },
-			body: {}
-		}
-	]);
+	registry([served(SLSA, provenance())]);
 	await expect(readVulnerabilityAttestation()).rejects.toThrow('was not scanned');
-	expect(verify).not.toHaveBeenCalled();
 });
 
-it('fails an attestation whose signature does not verify', async () => {
-	registry([{ body: bundle(statement()) }]);
-	verify.mockRejectedValue(new Error('invalid signature'));
+it('fails a scan whose signature does not verify', async () => {
+	registry([served(SLSA, provenance()), served(VULN, statement(), undefined)]);
 	await expect(readVulnerabilityAttestation()).rejects.toThrow('no vulnerability attestation of the running digest verified');
 });
 
-it('fails an attestation signed by an identity the platform does not allow, even though it verifies', async () => {
-	registry([{ body: bundle(statement()) }]);
-	verified('someone-else@example.test', CI.issuer);
+it('fails a scan signed by anyone but the identity that signed the image, even though it verifies', async () => {
+	registry([served(SLSA, provenance()), served(VULN, statement(), { issuer: CI.issuer, subject: 'someone-else@example.test' })]);
 	await expect(readVulnerabilityAttestation()).rejects.toThrow('verified');
 });
 
-it('accepts any developer of the app realm, and only under that realm', async () => {
-	registry([{ body: bundle(statement()) }]);
-	verify.mockImplementation(async (_bundle: unknown, options: { certificateIssuer: string }) =>
-		options.certificateIssuer === DEV.issuer
-			? { key: {}, identity: { subjectAlternativeName: 'dev@example.test' } }
-			: Promise.reject(new Error('another issuer'))
-	);
+it('fails a scan signed by the same name under another issuer', async () => {
+	registry([served(SLSA, provenance()), served(VULN, statement(), { issuer: 'https://auth.example.test/realms/two', subject: CI.subject })]);
+	await expect(readVulnerabilityAttestation()).rejects.toThrow('verified');
+});
+
+it('accepts a scan signed by a developer when the developer signed the image, so a dev image needs no listed identity', async () => {
+	const dev = { issuer: 'https://auth.example.test/realms/two', subject: 'dev@example.test' };
+	registry([served(SLSA, provenance(), dev), served(VULN, statement(), dev)]);
 	expect(await readVulnerabilityAttestation()).toMatchObject({ signer: 'dev@example.test' });
-	// The same identity under the platform realm's issuer is not the developer's.
-	verify.mockImplementation(async (_bundle: unknown, options: { certificateIssuer: string }) =>
-		options.certificateIssuer === CI.issuer
-			? { key: {}, identity: { subjectAlternativeName: 'dev@example.test' } }
-			: Promise.reject(new Error('another issuer'))
-	);
+});
+
+it('has no one to trust when the digest has no verifiable provenance', async () => {
+	registry([served(VULN, statement())]);
+	await expect(readVulnerabilityAttestation()).rejects.toThrow('no verifiable provenance');
+	registry([served(SLSA, provenance(), undefined), served(VULN, statement())]);
+	await expect(readVulnerabilityAttestation()).rejects.toThrow('no verifiable provenance');
+});
+
+it('ignores a provenance that names another digest', async () => {
+	registry([served(SLSA, provenance('b'.repeat(64))), served(VULN, statement())]);
+	await expect(readVulnerabilityAttestation()).rejects.toThrow('no verifiable provenance');
+});
+
+it('fails a scan that verifies but names another digest', async () => {
+	registry([served(SLSA, provenance()), served(VULN, statement({ subject: [{ digest: { sha256: 'b'.repeat(64) } }] }))]);
 	await expect(readVulnerabilityAttestation()).rejects.toThrow('verified');
 });
 
-it('fails an attestation that verifies but names another digest', async () => {
-	registry([{ body: bundle(statement({ subject: [{ digest: { sha256: 'b'.repeat(64) } }] })) }]);
-	verified('ci@example.test');
-	await expect(readVulnerabilityAttestation()).rejects.toThrow('verified');
-});
-
-it('uses the newest of several verified attestations', async () => {
+it('uses the newest of several verified scans', async () => {
 	const older = statement({ predicate: { scanner: { version: '1', result: { Results: [] } }, metadata: { scanFinishedOn: '2026-11-01T00:00:00Z' } } });
-	registry([{ body: bundle(older) }, { body: bundle(statement()) }]);
-	verified('ci@example.test');
+	registry([served(SLSA, provenance()), served(VULN, older), served(VULN, statement())]);
 	expect((await readVulnerabilityAttestation()).scannedAt).toBe('2026-11-17T10:00:00Z');
 });
 
@@ -226,14 +222,17 @@ it('refuses a registry that refuses the pull credential', async () => {
 });
 
 it('verifies once per digest and tries again after a failure', async () => {
-	registry([{ body: bundle(statement()) }]);
-	verified('ci@example.test');
+	registry([served(SLSA, provenance()), served(VULN, statement())]);
 	await attestationOnce();
 	await attestationOnce();
-	expect(verify).toHaveBeenCalledTimes(1);
+	expect(verify).toHaveBeenCalledTimes(2); // the provenance and the scan, once
 	resetAttestation();
+	verify.mockReset();
 	verify.mockRejectedValue(new Error('trust root unreachable'));
 	await expect(attestationOnce()).rejects.toThrow();
-	verified('ci@example.test');
+	verify.mockImplementation(async (b: { signedBy?: { issuer: string; subject: string } }) => ({
+		key: {},
+		identity: { subjectAlternativeName: b.signedBy!.subject, extensions: { issuer: b.signedBy!.issuer } }
+	}));
 	await expect(attestationOnce()).resolves.toMatchObject({ critical: 1 });
 });

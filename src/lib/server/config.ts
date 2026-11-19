@@ -142,9 +142,6 @@ export const config = {
 		tufMirrorUrl: env.SIGSTORE_TUF_MIRROR_URL || '',
 		tufRootFile: env.SIGSTORE_TUF_ROOT_FILE || '',
 		cacheDir: env.SIGSTORE_CACHE_DIR || '/tmp/sigstore',
-		// JSON list of { issuer, subject } or { issuer, subjectDomain }: who may
-		// have signed (the CI identity, or a developer of the app's own realm).
-		signers: env.ATTESTATION_SIGNERS || '[]',
 		maxAgeDays: parseInt(env.ATTESTATION_MAX_AGE_DAYS || '30'),
 		get enabled() {
 			return !!(env.IMAGE_REF && env.REGISTRY_AUTH_FILE && env.SIGSTORE_TUF_MIRROR_URL && env.SIGSTORE_TUF_ROOT_FILE);

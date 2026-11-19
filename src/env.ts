@@ -30,7 +30,6 @@ export const variables = defineEnvVars({
 	SIGSTORE_TUF_MIRROR_URL: optional,
 	SIGSTORE_TUF_ROOT_FILE: optional,
 	SIGSTORE_CACHE_DIR: optional,
-	ATTESTATION_SIGNERS: optional,
 	ATTESTATION_MAX_AGE_DAYS: optional,
 	CHAOS_ENGINE: optional,
 	CHAOS_INTERVAL_HOURS: optional

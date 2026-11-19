@@ -10,15 +10,23 @@ import { log } from './logger.js';
 // the developer's own identity. The app reads the attestations of its own
 // running digest with its own pull credential, verifies each against the
 // platform's trust root (the TUF mirror, pinned by the root.json the chart
-// carries) and the identities allowed to sign, and checks that its subject is
-// the running digest. Nothing is taken from the registry unverified, and no
-// credential for the scanner or for DefectDojo is involved.
+// carries), and checks that its subject is the running digest. Nothing is
+// taken from the registry unverified, and no credential for the scanner or for
+// DefectDojo is involved.
+//
+// Who may have signed is not listed here. The running image was admitted
+// because its SLSA provenance carries a signature the platform's admission
+// policy accepts, so the identity that signed that provenance is the one the
+// platform trusts for this digest. The scan counts only when it is signed by
+// the same identity under the same issuer: the CI signer for a CI image, the
+// developer for a dev image. No realm or signer is named in this app.
 //
 // What the attestation states is what the scan was asked for: HIGH and
 // CRITICAL findings that have a fix available. An empty list is a real "no
 // findings"; no attestation at all is "not scanned", a different thing.
 
 const VULN_PREDICATE = 'https://cosign.sigstore.dev/attestation/vuln/v1';
+const PROVENANCE_PREDICATE = 'https://slsa.dev/provenance/v1';
 const BUNDLE_TYPE = 'application/vnd.dev.sigstore.bundle.v0.3+json';
 const PREDICATE_ANNOTATION = 'dev.sigstore.bundle.predicateType';
 
@@ -34,26 +42,6 @@ export function parseImageRef(ref: string): RunningImage {
 	if (!match) throw new Error('the running image is not named by digest');
 	return { registry: match[1]!, repository: match[2]!, digest: match[3]! };
 }
-
-export interface Signer {
-	issuer: string;
-	/** An exact signer identity. */
-	subject?: string;
-	/** Any identity of this mail domain. */
-	subjectDomain?: string;
-}
-
-export function parseSigners(text: string): Signer[] {
-	const parsed: unknown = JSON.parse(text);
-	if (!Array.isArray(parsed)) throw new Error('the signer list is not a list');
-	return parsed.map((entry: Partial<Signer>) => {
-		if (!entry?.issuer || (!entry.subject && !entry.subjectDomain)) throw new Error('a signer needs an issuer and a subject or a subjectDomain');
-		return { issuer: entry.issuer, subject: entry.subject, subjectDomain: entry.subjectDomain };
-	});
-}
-
-const allows = (signer: Signer, issuer: string, identity: string): boolean =>
-	signer.issuer === issuer && (signer.subject ? signer.subject === identity : identity.endsWith(`@${signer.subjectDomain}`));
 
 export interface VulnSummary {
 	critical: number;
@@ -73,10 +61,12 @@ interface InTotoStatement {
 	};
 }
 
+const subjectIs = (statement: InTotoStatement, digest: string): boolean => !!statement.subject?.some((subject) => `sha256:${subject.digest?.sha256}` === digest);
+
 /** The statement a verified bundle carries, checked against the running digest, as counts. */
 export function summarise(statement: InTotoStatement, digest: string, signer: string): VulnSummary {
 	if (statement.predicateType !== VULN_PREDICATE) throw new Error('the attestation is not a vulnerability attestation');
-	if (!statement.subject?.some((subject) => `sha256:${subject.digest?.sha256}` === digest)) throw new Error('the attestation is for another digest');
+	if (!subjectIs(statement, digest)) throw new Error('the attestation is for another digest');
 	const scanner = statement.predicate?.scanner;
 	const results = scanner?.result?.Results;
 	if (!results || !statement.predicate?.metadata?.scanFinishedOn) throw new Error('the attestation carries no scan result');
@@ -93,30 +83,33 @@ export function summarise(statement: InTotoStatement, digest: string, signer: st
 
 type Bundle = Parameters<typeof verify>[0];
 
-/** Verifies one bundle against the trust root and the allowed signers, and returns its summary. */
-export async function verifyBundle(bundle: Bundle, image: RunningImage, signers: Signer[]): Promise<VulnSummary> {
-	let lastError: unknown = new Error('no signer is allowed');
-	for (const issuer of new Set(signers.map((signer) => signer.issuer))) {
-		try {
-			// The self-hosted Fulcio embeds no certificate transparency SCT, and the
-			// trust root lists no CT log, so the threshold is zero.
-			const identity = await verify(bundle, {
-				tufMirrorURL: config.attestation.tufMirrorUrl,
-				tufRootPath: config.attestation.tufRootFile,
-				tufCachePath: config.attestation.cacheDir,
-				certificateIssuer: issuer,
-				ctLogThreshold: 0
-			});
-			const subject = identity.identity?.subjectAlternativeName ?? '';
-			if (!signers.some((signer) => allows(signer, issuer, subject))) throw new Error('the signer is not one the platform allows');
-			const payload = (bundle as { dsseEnvelope?: { payload?: string } }).dsseEnvelope?.payload;
-			if (!payload) throw new Error('the bundle holds no attestation');
-			return summarise(JSON.parse(Buffer.from(payload, 'base64').toString('utf8')) as InTotoStatement, image.digest, subject);
-		} catch (err) {
-			lastError = err;
-		}
-	}
-	throw lastError;
+/** Who signed a bundle the platform trust root verified: the issuer of the certificate and its identity. */
+export interface SignerIdentity {
+	issuer: string;
+	subject: string;
+}
+
+export interface VerifiedBundle {
+	signer: SignerIdentity;
+	statement: InTotoStatement;
+}
+
+/** Verifies one bundle against the trust root and returns who signed it and what it states. */
+export async function verifyBundle(bundle: Bundle): Promise<VerifiedBundle> {
+	// The self-hosted Fulcio embeds no certificate transparency SCT, and the
+	// trust root lists no CT log, so the threshold is zero.
+	const verified = await verify(bundle, {
+		tufMirrorURL: config.attestation.tufMirrorUrl,
+		tufRootPath: config.attestation.tufRootFile,
+		tufCachePath: config.attestation.cacheDir,
+		ctLogThreshold: 0
+	});
+	const issuer = verified.identity?.extensions?.issuer;
+	const subject = verified.identity?.subjectAlternativeName;
+	if (!issuer || !subject) throw new Error('the signing certificate names no issuer or identity');
+	const payload = (bundle as { dsseEnvelope?: { payload?: string } }).dsseEnvelope?.payload;
+	if (!payload) throw new Error('the bundle holds no attestation');
+	return { signer: { issuer, subject }, statement: JSON.parse(Buffer.from(payload, 'base64').toString('utf8')) as InTotoStatement };
 }
 
 /** A registry client for one repository: the Docker token flow with the pull secret's credential. */
@@ -148,14 +141,14 @@ export function credentialFor(configJson: string, registry: string): string {
 	return auth;
 }
 
-/** Every vulnerability attestation bundle that rides the running digest, as the registry serves them. */
-async function vulnerabilityBundles(image: RunningImage, authB64: string): Promise<Bundle[]> {
+/** Every attestation bundle of one predicate type that rides the running digest, as the registry serves them. */
+async function attestationBundles(image: RunningImage, authB64: string, predicateType: string): Promise<Bundle[]> {
 	const registry = registryClient(image, authB64);
 	const index = await registry.get(`/referrers/${image.digest}`, 'application/vnd.oci.image.index.v1+json');
 	if (!index.ok) throw new Error(`the registry answered ${index.status} for the referrers of the running digest`);
 	const manifests =
 		((await index.json()) as { manifests?: Array<{ digest: string; artifactType?: string; annotations?: Record<string, string> }> }).manifests ?? [];
-	const mine = manifests.filter((m) => m.artifactType === BUNDLE_TYPE && m.annotations?.[PREDICATE_ANNOTATION] === VULN_PREDICATE);
+	const mine = manifests.filter((m) => m.artifactType === BUNDLE_TYPE && m.annotations?.[PREDICATE_ANNOTATION] === predicateType);
 	return Promise.all(
 		mine.map(async (m) => {
 			const manifest = await registry.get(`/manifests/${m.digest}`, 'application/vnd.oci.image.manifest.v1+json');
@@ -170,20 +163,36 @@ async function vulnerabilityBundles(image: RunningImage, authB64: string): Promi
 
 /**
  * The verified vulnerability attestation of the running digest, the newest
- * when there are several. Throws when there is none, or when none verifies.
+ * when there are several, signed by the identity that signed the digest's
+ * provenance. Throws when there is none, or when none verifies.
  */
 export async function readVulnerabilityAttestation(): Promise<VulnSummary> {
-	const { imageRef, authFile, signers } = config.attestation;
+	const { imageRef, authFile } = config.attestation;
 	const image = parseImageRef(imageRef);
 	const authB64 = credentialFor(readFileSync(authFile, 'utf8'), image.registry);
-	const bundles = await vulnerabilityBundles(image, authB64);
-	if (bundles.length === 0) throw new Error('the running digest has no vulnerability attestation: it was not scanned');
-	const allowed = parseSigners(signers);
+	const [scans, provenances] = await Promise.all([
+		attestationBundles(image, authB64, VULN_PREDICATE),
+		attestationBundles(image, authB64, PROVENANCE_PREDICATE)
+	]);
+	if (scans.length === 0) throw new Error('the running digest has no vulnerability attestation: it was not scanned');
+	// Who the platform trusts for this digest: the signers of its verified provenance.
+	const trusted: SignerIdentity[] = [];
+	for (const bundle of provenances) {
+		try {
+			const provenance = await verifyBundle(bundle);
+			if (provenance.statement.predicateType === PROVENANCE_PREDICATE && subjectIs(provenance.statement, image.digest)) trusted.push(provenance.signer);
+		} catch {
+			// A provenance that does not verify names no one.
+		}
+	}
+	if (trusted.length === 0) throw new Error('the running digest has no verifiable provenance to say who may sign its scan');
 	const verified: VulnSummary[] = [];
 	let failure: unknown;
-	for (const bundle of bundles) {
+	for (const bundle of scans) {
 		try {
-			verified.push(await verifyBundle(bundle, image, allowed));
+			const { signer, statement } = await verifyBundle(bundle);
+			if (!trusted.some((who) => who.issuer === signer.issuer && who.subject === signer.subject)) throw new Error('the scan is not signed by the identity that signed the image');
+			verified.push(summarise(statement, image.digest, signer.subject));
 		} catch (err) {
 			failure = err;
 		}

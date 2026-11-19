@@ -162,7 +162,6 @@ The Prometheus and Linkerd tabs render a data array of namespace-limited queries
 | `REGISTRY_AUTH_FILE`          | _(disabled)_        | Docker config file of the pull secret, mounted read-only |
 | `SIGSTORE_TUF_MIRROR_URL`     | _(disabled)_        | The platform's TUF mirror (trust root for attestations)  |
 | `SIGSTORE_TUF_ROOT_FILE`      | _(disabled)_        | The root.json the mirror was bootstrapped with           |
-| `ATTESTATION_SIGNERS`         | `[]`                | Identities allowed to have signed (JSON list)            |
 | `ATTESTATION_MAX_AGE_DAYS`    | `30`                | A scan older than this reads as stale                    |
 | `CHAOS_ENGINE`                | _(disabled)_        | Name of the chaos experiment this environment runs       |
 | `CHAOS_INTERVAL_HOURS`        | `4`                 | How often it is re-armed                                 |
