@@ -100,6 +100,12 @@ describe('Valkey connection options', () => {
 		expect(options).toMatchObject({ host: 'valkey.test', username: 'demo-dev', password: 's3cret', keyPrefix: 'demo-dev:' });
 	});
 
+	it('skips the INFO ready check for an ACL user, which is denied INFO', async () => {
+		vi.stubEnv('VALKEY_USERNAME_FILE', mount('username', 'demo-dev\n'));
+
+		expect((await connect()).enableReadyCheck).toBe(false);
+	});
+
 	it('sends no username and no prefix when the files are not set, as before the platform change', async () => {
 		vi.stubEnv('VALKEY_PASSWORD_FILE', mount('password', 's3cret\n'));
 
@@ -108,6 +114,7 @@ describe('Valkey connection options', () => {
 		expect(options.password).toBe('s3cret');
 		expect(options.username).toBeUndefined();
 		expect(options.keyPrefix).toBeUndefined();
+		expect(options.enableReadyCheck).toBe(true);
 	});
 
 	it('sends no username and no prefix when a mounted file is empty or not there yet', async () => {

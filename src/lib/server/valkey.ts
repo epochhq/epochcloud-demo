@@ -22,6 +22,11 @@ export async function initValkey(): Promise<void> {
 			// ioredis prepends this to every key of every command, so callers keep
 			// using bare keys and the ACL user's key pattern still matches.
 			keyPrefix: config.valkey.keyPrefix || undefined,
+			// The ready check sends INFO on every connect. The per-environment ACL
+			// user is denied INFO on purpose (it is in @dangerous), so with a user
+			// the check only warns before ioredis skips it; the default user keeps
+			// the check, which also waits for a still-loading server.
+			enableReadyCheck: !config.valkey.username,
 			db: config.valkey.database,
 			retryStrategy: (times) => {
 				// Retry indefinitely with exponential backoff capped at 30s.
