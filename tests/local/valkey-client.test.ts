@@ -51,7 +51,7 @@ async function connect() {
 	const { initValkey } = await import('../../src/lib/server/valkey.js');
 	await initValkey();
 	expect(clients).toHaveLength(1);
-	return clients[0].options;
+	return clients[0]!.options;
 }
 
 beforeEach(() => {
