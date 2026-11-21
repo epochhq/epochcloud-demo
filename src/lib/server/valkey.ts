@@ -17,7 +17,11 @@ export async function initValkey(): Promise<void> {
 		client = new Redis({
 			host: config.valkey.host,
 			port: config.valkey.port,
+			username: config.valkey.username || undefined,
 			password: config.valkey.password || undefined,
+			// ioredis prepends this to every key of every command, so callers keep
+			// using bare keys and the ACL user's key pattern still matches.
+			keyPrefix: config.valkey.keyPrefix || undefined,
 			db: config.valkey.database,
 			retryStrategy: (times) => {
 				// Retry indefinitely with exponential backoff capped at 30s.
