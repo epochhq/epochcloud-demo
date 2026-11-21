@@ -5,7 +5,30 @@ import { join } from 'node:path';
 
 const { clients } = vi.hoisted(() => ({ clients: [] as Array<{ options: Record<string, unknown> }> }));
 
-vi.mock('$app/env/private', () => ({}));
+// config.ts reads its plain settings from SvelteKit's private env module; none matter here.
+vi.mock('$app/env/private', () => ({
+	BETTERAUTH_URL: '',
+	CONSUMER_MODE: '',
+	CROWDSEC_LAPI_URL: '',
+	DEFECTDOJO_PRODUCT: '',
+	DEFECTDOJO_URL: '',
+	ENVIRONMENT: '',
+	FARO_ENABLED: '',
+	FARO_RECEIVER_URL: '',
+	GOFEATUREFLAG_URL: '',
+	HOSTNAME: '',
+	KNATIVE_FIBONACCI_URL: '',
+	NTFY_TOPIC_PREFIX: '',
+	NTFY_URL: '',
+	POD_NAMESPACE: '',
+	PORT: '',
+	RABBITMQ_QUEUE: '',
+	RYBBIT_HOST: '',
+	RYBBIT_SITE_ID: '',
+	SMTP_FROM: '',
+	SMTP_HOST: '',
+	SMTP_PORT: ''
+}));
 vi.mock('#lib/server/logger.js', () => ({ log: vi.fn() }));
 vi.mock('ioredis', () => ({
 	default: class {
