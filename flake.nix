@@ -42,7 +42,33 @@
     assert runtimeInputsMatch;
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        nativeHttpOverlay = _final: prev: {
+          brotli = if prev.lib.versionOlder prev.brotli.version "1.2.1"
+            then prev.brotli.overrideAttrs {
+              version = "1.2.1";
+              src = prev.fetchFromGitHub {
+                owner = "google";
+                repo = "brotli";
+                tag = "v1.2.1";
+                hash = "sha256-llY72cYffDv0ugsH0p89xIPEbElV4L8u7U/Fe8hT3gI=";
+              };
+            } else prev.brotli;
+          curlMinimal = if prev.lib.versionOlder prev.curlMinimal.version "8.23.0"
+            then prev.curlMinimal.overrideAttrs (old: {
+              version = "8.23.0";
+              configureFlags = builtins.filter (flag: flag != "--without-librtmp") old.configureFlags;
+              # The selected release already includes the wakeup-consumption fix.
+              patches = builtins.filter (patch: builtins.baseNameOf (toString patch) != "fix-wakeup-consumption.patch") (old.patches or [ ]);
+              src = prev.stdenv.fetchurlBoot {
+                urls = [
+                  "https://curl.haxx.se/download/curl-8.23.0.tar.xz"
+                  "https://github.com/curl/curl/releases/download/curl-8_23_0/curl-8.23.0.tar.xz"
+                ];
+                hash = "sha256-ja3X0lNqMU+YKtBaZRtxP0Jr99Aswsds/7l5byIY5sU=";
+              };
+            }) else prev.curlMinimal;
+        };
+        pkgs = import nixpkgs { inherit system; overlays = [ nativeHttpOverlay ]; };
         bunSource = bunArchives.${system};
         bun = pkgs.bun.overrideAttrs (_: {
           version = bunVersion;
