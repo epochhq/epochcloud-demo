@@ -18,7 +18,8 @@
 	import EmailDemo from './components/demos/EmailDemo.svelte';
 	import BetterAuthDemo from './components/demos/BetterAuthDemo.svelte';
 	import CrowdSecDemo from './components/demos/CrowdSecDemo.svelte';
-	import DefectDojoDemo from './components/demos/DefectDojoDemo.svelte';
+	import VulnerabilitiesDemo from './components/demos/VulnerabilitiesDemo.svelte';
+	import ChaosDemo from './components/demos/ChaosDemo.svelte';
 	import PrometheusDemo from './components/demos/PrometheusDemo.svelte';
 	import LinkerdDemo from './components/demos/LinkerdDemo.svelte';
 	import FeatureFlagsDemo from './components/demos/FeatureFlagsDemo.svelte';
@@ -91,11 +92,10 @@
 			<BetterAuthDemo enabled={data.features.betterauth} />
 		{:else if activeDemo === 'crowdsec'}
 			<CrowdSecDemo enabled={data.features.crowdsec} />
-		{:else if activeDemo === 'defectdojo'}
-			<DefectDojoDemo
-				enabled={data.features.defectdojo}
-				domain={data.domain}
-			/>
+		{:else if activeDemo === 'vulnerabilities'}
+			<VulnerabilitiesDemo enabled={data.features.vulnerabilities} />
+		{:else if activeDemo === 'chaos'}
+			<ChaosDemo enabled={data.features.chaos} />
 		{:else if activeDemo === 'prometheus'}
 			<PrometheusDemo />
 		{:else if activeDemo === 'linkerd'}

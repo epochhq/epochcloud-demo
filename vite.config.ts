@@ -70,7 +70,7 @@ export default defineConfig({
 			__APP_COMMIT__: 'readonly',
 			__APP_BUILD_TIME__: 'readonly'
 		},
-		ignorePatterns: ['**/.svelte-kit/**', '**/build/**', '**/dist/**', '**/node_modules/**'],
+		ignorePatterns: ['**/.svelte-kit/**', '**/.direnv/**', '**/build/**', '**/dist/**', '**/node_modules/**'],
 		rules: {
 			'constructor-super': 'error',
 			'for-direction': 'error',
@@ -177,7 +177,7 @@ export default defineConfig({
 		singleAttributePerLine: true,
 		sortPackageJson: false,
 		svelte: {},
-		ignorePatterns: ['.svelte-kit', 'build', 'dist', 'node_modules', 'bun.lock']
+		ignorePatterns: ['.svelte-kit', '.direnv', 'build', 'dist', 'node_modules', 'bun.lock']
 	},
 	test: {
 		include: ['tests/local/**/*.test.ts']

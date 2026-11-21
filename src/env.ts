@@ -10,8 +10,6 @@ export const variables = defineEnvVars({
 	HOSTNAME: optional,
 	CONSUMER_MODE: optional,
 	RABBITMQ_QUEUE: optional,
-	DEFECTDOJO_URL: optional,
-	DEFECTDOJO_PRODUCT: optional,
 	RYBBIT_SITE_ID: optional,
 	RYBBIT_HOST: optional,
 	SMTP_HOST: optional,
@@ -23,9 +21,16 @@ export const variables = defineEnvVars({
 	NTFY_TOPIC_PREFIX: optional,
 	POD_NAMESPACE: optional,
 	KNATIVE_FIBONACCI_URL: optional,
-	CROWDSEC_LAPI_URL: optional,
 	FARO_ENABLED: optional,
 	FARO_RECEIVER_URL: optional,
 	PROMETHEUS_URL: optional,
-	ENTRYPOINT_URL: optional
+	ENTRYPOINT_URL: optional,
+	IMAGE_REF: optional,
+	REGISTRY_AUTH_FILE: optional,
+	SIGSTORE_TUF_MIRROR_URL: optional,
+	SIGSTORE_TUF_ROOT_FILE: optional,
+	SIGSTORE_CACHE_DIR: optional,
+	ATTESTATION_MAX_AGE_DAYS: optional,
+	CHAOS_ENGINE: optional,
+	CHAOS_INTERVAL_HOURS: optional
 });

@@ -10,7 +10,6 @@ import { readSecret } from './secrets.js';
 const rabbitmqHost = readSecret('RABBITMQ_HOST') || '';
 const valkeyHost = readSecret('VALKEY_HOST') || '';
 const databaseUrl = readSecret('DATABASE_URL') || '';
-const defectdojoToken = readSecret('DEFECTDOJO_TOKEN') || '';
 
 export const config = {
 	// Build info - stamped at `vite build` time via the `define` constants in
@@ -73,17 +72,6 @@ export const config = {
 		}
 	},
 
-	// DefectDojo
-	defectdojo: {
-		url: env.DEFECTDOJO_URL || '',
-		token: defectdojoToken,
-		// The product whose findings the page shows; other tenants' stay hidden.
-		product: env.DEFECTDOJO_PRODUCT || 'epochcloud-demo',
-		get enabled() {
-			return !!(env.DEFECTDOJO_URL && defectdojoToken);
-		}
-	},
-
 	// Rybbit analytics
 	rybbit: {
 		siteId: env.RYBBIT_SITE_ID || '',
@@ -140,18 +128,34 @@ export const config = {
 		}
 	},
 
-	// CrowdSec LAPI
-	crowdsec: {
-		lapiUrl: env.CROWDSEC_LAPI_URL || '',
-		bouncerKey: readSecret('CROWDSEC_BOUNCER_KEY') || '',
-		get enabled() {
-			return !!env.CROWDSEC_LAPI_URL;
-		}
-	},
-
 	// The public address this environment is served at (https://<host>, no path).
 	// The Linkerd check sends its own request to it; unset skips that request.
 	entrypointUrl: env.ENTRYPOINT_URL || '',
+
+	// The vulnerability attestation of the running image. The chart gives the
+	// app its own image reference (with the digest it runs), the pull secret
+	// mounted as a file, and the platform's trust anchor: the TUF mirror and the
+	// root.json it was bootstrapped with. Unset skips the check.
+	attestation: {
+		imageRef: env.IMAGE_REF || '',
+		authFile: env.REGISTRY_AUTH_FILE || '',
+		tufMirrorUrl: env.SIGSTORE_TUF_MIRROR_URL || '',
+		tufRootFile: env.SIGSTORE_TUF_ROOT_FILE || '',
+		cacheDir: env.SIGSTORE_CACHE_DIR || '/tmp/sigstore',
+		maxAgeDays: parseInt(env.ATTESTATION_MAX_AGE_DAYS || '30'),
+		get enabled() {
+			return !!(env.IMAGE_REF && env.REGISTRY_AUTH_FILE && env.SIGSTORE_TUF_MIRROR_URL && env.SIGSTORE_TUF_ROOT_FILE);
+		}
+	},
+
+	// The tenant chaos experiment the chart ships and how often it is re-armed.
+	chaos: {
+		engine: env.CHAOS_ENGINE || '',
+		intervalHours: parseFloat(env.CHAOS_INTERVAL_HOURS || '4'),
+		get enabled() {
+			return !!env.CHAOS_ENGINE;
+		}
+	},
 
 	// Grafana Faro frontend observability
 	faro: {

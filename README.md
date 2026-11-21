@@ -18,7 +18,8 @@ SvelteKit 3 and Svelte 5 demo app for the EpochCloud Kubernetes platform.
 - **Health probe** (`/health`)
 - **RabbitMQ** pub/sub demo via `amqplib`
 - **Valkey** cache demo via `ioredis`
-- **DefectDojo** security status API client
+- **Vulnerability attestation** of the running image, verified against the platform trust root
+- **Edge canary** (CrowdSec) and **chaos experiment** checks
 - **Email** via Maddy SMTP relay (nodemailer)
 - **BetterAuth** HTTP status and session forwarding to the standalone auth server
 - **Structured logging** (JSON via custom logger)
@@ -47,7 +48,9 @@ epochcloud-demo/
 │   │       ├── metrics.ts        # Prometheus metrics (prom-client)
 │   │       ├── rabbitmq.ts       # RabbitMQ client (amqplib)
 │   │       ├── valkey.ts         # Valkey client (ioredis)
-│   │       ├── defectdojo.ts     # DefectDojo API client
+│   │       ├── attestation.ts    # Signed vulnerability attestation of the running image
+│   │       ├── edge.ts           # CrowdSec canary and control request, per-host refusals
+│   │       ├── chaos.ts          # Litmus pod-delete result, cross-checked with pod and request evidence
 │   │       └── smtp.ts           # Email via nodemailer
 │   └── routes/
 │       ├── +page.svelte          # Landing page (glassmorphism UI)
@@ -131,42 +134,46 @@ The Prometheus and Linkerd tabs render a data array of namespace-limited queries
 
 ## Environment Variables
 
-| Variable                      | Default             | Description                                               |
-| ----------------------------- | ------------------- | --------------------------------------------------------- |
-| `ENVIRONMENT`                 | `dev`               | Environment badge + metrics label                         |
-| `PORT`                        | `3000`              | HTTP listen port                                          |
-| `CONSUMER_MODE`               | `false`             | Only `/health` + `/metrics`, starts RabbitMQ consumer     |
-| `RABBITMQ_HOST`               | _(disabled)_        | RabbitMQ hostname                                         |
-| `RABBITMQ_PORT`               | `5672`              | RabbitMQ port                                             |
-| `RABBITMQ_USERNAME`           |                     | RabbitMQ user                                             |
-| `RABBITMQ_PASSWORD`           |                     | RabbitMQ password                                         |
-| `RABBITMQ_VHOST`              | `/`                 | RabbitMQ virtual host                                     |
-| `RABBITMQ_QUEUE`              | `epochcloud-demo`   | Queue name                                                |
-| `VALKEY_HOST`                 | _(disabled)_        | Valkey/Redis host                                         |
-| `VALKEY_PORT`                 | `6379`              | Valkey port                                               |
-| `VALKEY_PASSWORD`             |                     | Valkey password                                           |
-| `VALKEY_DATABASE`             | `0`                 | Valkey DB number                                          |
-| `DEFECTDOJO_URL`              | _(disabled)_        | DefectDojo API URL                                        |
-| `DEFECTDOJO_TOKEN`            |                     | DefectDojo API token                                      |
-| `SMTP_HOST`                   | _(disabled)_        | Maddy SMTP relay host                                     |
-| `SMTP_PORT`                   | `587`               | SMTP port                                                 |
-| `SMTP_FROM`                   | _(email disabled)_  | Sender address; the test mail needs it                    |
-| `POD_NAMESPACE`               | pod DNS search path | Namespace the Prometheus proofs are limited to            |
-| `DEFECTDOJO_PRODUCT`          | `epochcloud-demo`   | The only product whose findings the page shows            |
-| `NTFY_URL`                    | _(disabled)_        | ntfy server; topics are `NTFY_TOPIC_PREFIX-<env>-...`     |
-| `NTFY_TOPIC_PREFIX`           | `epochcloud-demo`   | Prefix every published topic must start with              |
-| `FARO_RECEIVER_URL`           | _(relay disabled)_  | Collector the browser telemetry relay forwards to         |
-| `PROMETHEUS_URL`              | _(disabled)_        | Prometheus the proofs query                               |
-| `ENTRYPOINT_URL`              | _(no probe)_        | Public address the Linkerd check requests through Traefik |
-| `BETTERAUTH_URL`              | _(disabled)_        | BetterAuth server URL                                     |
-| `RYBBIT_SITE_ID`              |                     | Rybbit analytics site ID                                  |
-| `RYBBIT_HOST`                 |                     | Rybbit analytics host                                     |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(disabled)_        | OTLP gRPC collector URL                                   |
-| `OTEL_SERVICE_NAME`           |                     | Service name on spans, read by the OTel SDK               |
-| `OTEL_RESOURCE_ATTRIBUTES`    |                     | Span resource attributes, read by the SDK                 |
+| Variable                      | Default             | Description                                              |
+| ----------------------------- | ------------------- | -------------------------------------------------------- |
+| `ENVIRONMENT`                 | `dev`               | Environment badge + metrics label                        |
+| `PORT`                        | `3000`              | HTTP listen port                                         |
+| `CONSUMER_MODE`               | `false`             | Only `/health` + `/metrics`, starts RabbitMQ consumer    |
+| `RABBITMQ_HOST`               | _(disabled)_        | RabbitMQ hostname                                        |
+| `RABBITMQ_PORT`               | `5672`              | RabbitMQ port                                            |
+| `RABBITMQ_USERNAME`           |                     | RabbitMQ user                                            |
+| `RABBITMQ_PASSWORD`           |                     | RabbitMQ password                                        |
+| `RABBITMQ_VHOST`              | `/`                 | RabbitMQ virtual host                                    |
+| `RABBITMQ_QUEUE`              | `epochcloud-demo`   | Queue name                                               |
+| `VALKEY_HOST`                 | _(disabled)_        | Valkey/Redis host                                        |
+| `VALKEY_PORT`                 | `6379`              | Valkey port                                              |
+| `VALKEY_PASSWORD`             |                     | Valkey password                                          |
+| `VALKEY_DATABASE`             | `0`                 | Valkey DB number                                         |
+| `SMTP_HOST`                   | _(disabled)_        | Maddy SMTP relay host                                    |
+| `SMTP_PORT`                   | `587`               | SMTP port                                                |
+| `SMTP_FROM`                   | _(email disabled)_  | Sender address; the test mail needs it                   |
+| `POD_NAMESPACE`               | pod DNS search path | Namespace the Prometheus proofs are limited to           |
+| `NTFY_URL`                    | _(disabled)_        | ntfy server; topics are `NTFY_TOPIC_PREFIX-<env>-...`    |
+| `NTFY_TOPIC_PREFIX`           | `epochcloud-demo`   | Prefix every published topic must start with             |
+| `FARO_RECEIVER_URL`           | _(relay disabled)_  | Collector the browser telemetry relay forwards to        |
+| `PROMETHEUS_URL`              | _(disabled)_        | Prometheus the proofs query                              |
+| `ENTRYPOINT_URL`              | _(no probe)_        | Public address the Linkerd and CrowdSec checks request   |
+| `IMAGE_REF`                   | _(disabled)_        | The image this pod runs, by digest (vulnerability check) |
+| `REGISTRY_AUTH_FILE`          | _(disabled)_        | Docker config file of the pull secret, mounted read-only |
+| `SIGSTORE_TUF_MIRROR_URL`     | _(disabled)_        | The platform's TUF mirror (trust root for attestations)  |
+| `SIGSTORE_TUF_ROOT_FILE`      | _(disabled)_        | The root.json the mirror was bootstrapped with           |
+| `ATTESTATION_MAX_AGE_DAYS`    | `30`                | A scan older than this reads as stale                    |
+| `CHAOS_ENGINE`                | _(disabled)_        | Name of the chaos experiment this environment runs       |
+| `CHAOS_INTERVAL_HOURS`        | `4`                 | How often it is re-armed                                 |
+| `BETTERAUTH_URL`              | _(disabled)_        | BetterAuth server URL                                    |
+| `RYBBIT_SITE_ID`              |                     | Rybbit analytics site ID                                 |
+| `RYBBIT_HOST`                 |                     | Rybbit analytics host                                    |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(disabled)_        | OTLP gRPC collector URL                                  |
+| `OTEL_SERVICE_NAME`           |                     | Service name on spans, read by the OTel SDK              |
+| `OTEL_RESOURCE_ATTRIBUTES`    |                     | Span resource attributes, read by the SDK                |
 
 Every secret-backed variable (RabbitMQ, Valkey, `DATABASE_URL`,
-`DEFECTDOJO_TOKEN`, `NTFY_USER` / `NTFY_PASSWORD`, `CROWDSEC_BOUNCER_KEY`)
+`NTFY_USER` / `NTFY_PASSWORD`)
 also accepts a `<NAME>_FILE` variant naming a file to read the value from;
 when both are set the file wins. The charts use the `_FILE` form with mounted
 Secret volumes so secret values never sit in process env

@@ -1,8 +1,10 @@
 import { networkInterfaces } from 'node:os';
 import { config } from './config.js';
 import { getCnpgStatus } from './cnpg.js';
-import { getDefectDojoSummary } from './defectdojo.js';
-import { upstream } from './http.js';
+import { attestationOnce } from './attestation.js';
+import { readChaos, judgeChaos } from './chaos.js';
+import { edgeEnabled, judgeEdge, probeEdge, readRefusalsOrNull } from './edge.js';
+import { isTimeout, upstream, withDeadline } from './http.js';
 import { invokeFibonacci } from './knative.js';
 import { getRabbitStatus } from './rabbitmq.js';
 import { verifySmtp } from './smtp.js';
@@ -26,6 +28,9 @@ export function podAddress(): string {
 // Every integration the page reports on, as data. Each run proves its
 // capability against the real service: a round trip, a query, or a handshake.
 // Results carry no internal addresses; the page gets counts and words.
+/** The CrowdSec canary's period; see the check. */
+export const CANARY_EVERY_MS = 15 * 60_000;
+
 defineChecks([
 	{
 		name: 'rabbitmq',
@@ -58,22 +63,62 @@ defineChecks([
 		}
 	},
 	{
+		// The edge protection, proven with one harmless request the CrowdSec
+		// layer must refuse and the same request without it (src/lib/server/
+		// edge.ts). A served canary fails: that is what an AppSec outage, which
+		// fails open, looks like from here. The counts beside it are this host's
+		// refusals from the platform's per-host counter; they are supporting
+		// evidence and never decide the dot.
 		name: 'crowdsec',
-		enabled: () => config.crowdsec.enabled && !!config.crowdsec.bouncerKey,
-		missing: 'Unavailable: needs a per-app read-only key from the platform',
-		// A decisions lookup with the bouncer key succeeds only when the LAPI is up
-		// and accepts the key, which /health does not prove.
+		enabled: edgeEnabled,
+		missing: 'No public address configured for this environment',
+		// fail2ban at the edge bans a sender address after ten refusals in ten
+		// minutes, and it counts the canary's. One canary per pod every fifteen
+		// minutes keeps every pod of every environment that shares one attributed
+		// sender address under that limit, whichever address Traefik attributes.
+		everyMs: CANARY_EVERY_MS,
 		run: async () => {
-			const resp = await upstream(`${config.crowdsec.lapiUrl}/v1/decisions?ip=127.0.0.1`, { headers: { 'X-Api-Key': config.crowdsec.bouncerKey } });
-			if (!resp.ok) throw new Error(`LAPI answered ${resp.status} to the bouncer key`);
+			const probe = await probeEdge(config.entrypointUrl);
+			judgeEdge(probe);
+			const namespace = currentNamespace();
+			const refusals = prometheusEnabled() && namespace ? await readRefusalsOrNull(namespace, config.entrypointUrl) : null;
+			return { canary_status: probe.canaryStatus, control_status: probe.controlStatus, refusals };
 		}
 	},
 	{
-		name: 'defectdojo',
-		enabled: () => config.defectdojo.enabled,
-		missing: 'Unavailable: the platform offers apps no read-only DefectDojo identity yet',
-		everyMs: 60_000,
-		run: async () => ({ ...(await getDefectDojoSummary()) })
+		// The scan result of the running digest, read from the registry as the
+		// signed attestation the platform attached to it and verified against
+		// the platform's trust root (src/lib/server/attestation.ts). Verified
+		// once per digest; the first verification fetches the trust root, so a
+		// run that has not finished says so instead of failing.
+		name: 'vulnerabilities',
+		enabled: () => config.attestation.enabled,
+		missing: 'Not configured: needs the running image reference and the platform trust root',
+		everyMs: 600_000,
+		run: async () => {
+			let summary;
+			try {
+				summary = await withDeadline(attestationOnce(), 3_500, 'the attestation check');
+			} catch (err) {
+				if (isTimeout(err)) throw new NotRunning('Verifying the attestation of the running image; the first verification fetches the platform trust root');
+				throw err;
+			}
+			const ageDays = (Date.now() - Date.parse(summary.scannedAt)) / 86_400_000;
+			if (ageDays > config.attestation.maxAgeDays)
+				throw new NotRunning(`The scan of the running image is from ${summary.scannedAt}, older than ${config.attestation.maxAgeDays} days`);
+			return { critical: summary.critical, high: summary.high, scanned_at: summary.scannedAt, scanner: summary.scanner, signer: summary.signer };
+		}
+	},
+	{
+		name: 'chaos',
+		enabled: () => config.chaos.enabled && prometheusEnabled(),
+		missing: 'No chaos experiment configured for this environment',
+		everyMs: 300_000,
+		run: async () => {
+			const namespace = currentNamespace();
+			if (!namespace) throw new Error('namespace unknown');
+			return judgeChaos(await readChaos(namespace));
+		}
 	},
 	{
 		name: 'featureflags',
