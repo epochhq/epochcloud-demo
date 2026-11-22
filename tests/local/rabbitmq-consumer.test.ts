@@ -67,6 +67,13 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
+// The channel the nth connection opened, and the nth connection itself.
+const channelOf = (n: number): FakeChannel => {
+	const channel = (connections[n] as FakeConnection).channels[0];
+	if (!channel) throw new Error(`connection ${n} opened no channel`);
+	return channel;
+};
+
 const load = async () => {
 	const rabbit = await import('../../src/lib/server/rabbitmq.js');
 	const health = await import('../../src/routes/health/+server.js');
@@ -78,7 +85,7 @@ it('subscribes on the first connection and reports itself consuming', async () =
 	expect(rabbit.isConsuming()).toBe(false);
 	expect((await health()).status).toBe(503);
 	await rabbit.initRabbitMQ();
-	expect((connections[0] as FakeConnection).channels[0].consume).toHaveBeenCalledTimes(1);
+	expect(channelOf(0).consume).toHaveBeenCalledTimes(1);
 	expect(rabbit.isConsuming()).toBe(true);
 	expect((await health()).status).toBe(200);
 });
@@ -86,7 +93,7 @@ it('subscribes on the first connection and reports itself consuming', async () =
 it('subscribes again after the broker cancels the consumer on a channel that stays open', async () => {
 	const { rabbit, health } = await load();
 	await rabbit.initRabbitMQ();
-	const first = (connections[0] as FakeConnection).channels[0];
+	const first = channelOf(0);
 	first.callback?.(null);
 	await vi.advanceTimersByTimeAsync(0);
 	expect(rabbit.isConsuming()).toBe(false);
@@ -95,7 +102,7 @@ it('subscribes again after the broker cancels the consumer on a channel that sta
 	expect((await health()).status).toBe(503);
 	await vi.advanceTimersByTimeAsync(1000);
 	expect(connections).toHaveLength(2);
-	expect((connections[1] as FakeConnection).channels[0].consume).toHaveBeenCalledTimes(1);
+	expect(channelOf(1).consume).toHaveBeenCalledTimes(1);
 	expect(rabbit.isConsuming()).toBe(true);
 	expect((await health()).status).toBe(200);
 });
@@ -106,7 +113,7 @@ it('subscribes again after the connection drops', async () => {
 	(connections[0] as FakeConnection).emit('close');
 	expect(rabbit.isConsuming()).toBe(false);
 	await vi.advanceTimersByTimeAsync(1000);
-	expect((connections[1] as FakeConnection).channels[0].consume).toHaveBeenCalledTimes(1);
+	expect(channelOf(1).consume).toHaveBeenCalledTimes(1);
 	expect(rabbit.isConsuming()).toBe(true);
 });
 
