@@ -56,8 +56,8 @@ async function init() {
 		await Promise.allSettled([closeRabbit(), closeValkey(), closeCnpg()]);
 	});
 
-	// The consumer subscribes inside connect(), on the first connection and on
-	// every reconnect.
+	// The consumer subscribes inside the recovery setup in rabbitmq.ts, on the
+	// first connection and after every recovery.
 	if (config.consumerMode) {
 		log('info', 'Consumer mode active - only /health and /metrics routes available');
 	}

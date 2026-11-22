@@ -1,16 +1,17 @@
-import amqplib, { type ChannelModel, type ConfirmChannel } from 'amqplib';
+import amqplib, { type ChannelModel, type ConfirmChannel, type RecoveringChannelModel } from 'amqplib';
 import { config } from './config.js';
 import { PUBLISH_CONFIRM_MS, UPSTREAM_TIMEOUT_MS } from '../limits.js';
 import { withDeadline } from './http.js';
 import { log } from './logger.js';
 import { rabbitConnected, rabbitMessagesPublished, rabbitMessagesConsumed, rabbitPublishErrors } from './metrics.js';
 
-let connection: ChannelModel | null = null;
+// The recovering connection: amqplib's opt-in recovery reconnects with a growing
+// delay and runs `setup` after every successful connect.
+let connection: RecoveringChannelModel | null = null;
 let channel: ConfirmChannel | null = null;
-let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 let consuming = false;
-let backoffMs = 1000;
-const MAX_BACKOFF = 30000;
+const RECONNECT_INITIAL_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
 const PUBLISH_CONFIRM_TIMEOUT_MS = PUBLISH_CONFIRM_MS;
 const BROKER_PROBE_TIMEOUT_MS = 2000;
 
@@ -23,80 +24,53 @@ function getUrl(): string {
 	return `amqp://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}:${port}/${encodedVhost}`;
 }
 
-async function connect(): Promise<void> {
-	if (!config.rabbitmq.enabled) return;
-
+// Runs on every successful connection, the first and each recovery: it opens the
+// confirm channel and, in consumer mode, subscribes on it. A consumer lives on
+// its channel, so every new connection needs its own subscription. A throw here
+// closes the connection and recovery tries again after its delay.
+async function setup(model: ChannelModel): Promise<void> {
 	try {
-		connection = await withDeadline(amqplib.connect(getUrl()), UPSTREAM_TIMEOUT_MS, 'the broker');
-
-		// Register event handlers IMMEDIATELY after connect, before createChannel.
-		// If the connection drops before handlers are attached, Node.js throws
-		// "Unhandled 'error' event" and crashes the process.
-		connection.on('close', () => {
-			log('warn', 'RabbitMQ connection closed, reconnecting...');
-			rabbitConnected.set(0);
-			consuming = false;
-			channel = null;
-			connection = null;
-			scheduleReconnect();
-		});
-
-		connection.on('error', (err) => {
-			log('error', 'RabbitMQ connection error', { error: String(err) });
-			rabbitConnected.set(0);
-		});
-
 		// Confirm channel: the broker acks every publish, so publishMessage
 		// can distinguish delivered from dropped instead of fire-and-forget.
-		const ch = await connection.createConfirmChannel();
-		channel = ch;
+		const ch = await model.createConfirmChannel();
 
 		ch.on('error', (err) => {
 			log('error', 'RabbitMQ channel error', { error: String(err) });
 		});
 
 		// A channel can die while the connection stays up (a failed queue op
-		// closes only the channel). Cycle the connection so the connection
-		// close handler rebuilds both through the normal reconnect path.
+		// closes only the channel, and so does a cancelled consumer). Close the
+		// connection: recovery opens a new one and runs setup again.
 		ch.on('close', () => {
 			if (channel === ch) {
 				consuming = false;
 				channel = null;
-				connection?.close().catch(() => {});
+				rabbitConnected.set(0);
+				model.close().catch(() => {});
 			}
 		});
 
 		// checkQueue, not assertQueue: the queue is owned by the
-		// rabbitmq.com Topology Operator (Queue CR in
-		// kubernetes/apps/epochcloud-demo/templates/rabbitmq-demo.yaml).
+		// rabbitmq.com Topology Operator (a Queue CR in the app's chart).
 		// assertQueue would re-declare with default args (classic queue,
 		// no x-queue-type) - when the operator's Queue is `type: quorum`
 		// the type-mismatch fails the channel with PRECONDITION_FAILED.
 		// checkQueue only verifies existence; the operator stays the
 		// single source of truth for queue type / durability / args.
 		await withDeadline(ch.checkQueue(config.rabbitmq.queue), UPSTREAM_TIMEOUT_MS, 'the broker');
+		channel = ch;
 
-		// A consumer lives on the channel, so every new channel needs its own
-		// subscription: after a reconnect the old one is gone.
-		if (config.consumerMode) await startConsumer();
+		if (config.consumerMode) await startConsumer(ch);
 
 		rabbitConnected.set(1);
-		backoffMs = 1000;
 		log('info', 'RabbitMQ connected', { host: config.rabbitmq.host });
 	} catch (err) {
 		log('error', 'RabbitMQ connect failed', { error: String(err) });
 		rabbitConnected.set(0);
-		scheduleReconnect();
+		consuming = false;
+		channel = null;
+		throw err;
 	}
-}
-
-function scheduleReconnect(): void {
-	if (reconnectTimeout) return;
-	reconnectTimeout = setTimeout(async () => {
-		reconnectTimeout = null;
-		await connect();
-	}, backoffMs);
-	backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF);
 }
 
 export async function initRabbitMQ(): Promise<void> {
@@ -104,24 +78,40 @@ export async function initRabbitMQ(): Promise<void> {
 		log('info', 'RabbitMQ disabled (RABBITMQ_HOST not set)');
 		return;
 	}
-	await connect();
+	// Not awaited: with unlimited retries the promise settles only on the first
+	// successful connection, and the server must start meanwhile.
+	void amqplib
+		.connect(getUrl(), {
+			recovery: { initialDelay: RECONNECT_INITIAL_MS, maxDelay: RECONNECT_MAX_MS, factor: 2, setup }
+		})
+		.then((recovering) => {
+			connection = recovering;
+			recovering.on('error', (err) => {
+				log('error', 'RabbitMQ connection error', { error: String(err) });
+				rabbitConnected.set(0);
+			});
+			recovering.on('disconnect', (err) => {
+				log('warn', 'RabbitMQ connection lost, recovering', { error: String(err) });
+				rabbitConnected.set(0);
+				consuming = false;
+				channel = null;
+			});
+		});
 }
 
-export async function startConsumer(): Promise<void> {
-	if (!channel) return;
-
-	await channel.consume(
+async function startConsumer(ch: ConfirmChannel): Promise<void> {
+	await ch.consume(
 		config.rabbitmq.queue,
 		(msg) => {
 			if (!msg) {
 				// RabbitMQ cancelled this consumer (its queue was deleted or
-				// recreated). The channel stays open, so nothing subscribes again by
-				// itself and the pod would sit Ready with no consumer. End the channel:
-				// its close handler cycles the connection and connect() subscribes
-				// on the new one.
+				// recreated). The channel stays open and recovery watches only the
+				// connection, so nothing would subscribe again and the pod would sit
+				// Ready with no consumer. End the channel: its close handler closes
+				// the connection and recovery runs setup on a new one.
 				consuming = false;
 				log('warn', 'RabbitMQ cancelled the consumer, reconnecting', { queue: config.rabbitmq.queue });
-				void channel?.close().catch(() => {});
+				void ch.close().catch(() => {});
 				return;
 			}
 			const content = msg.content.toString();
@@ -135,7 +125,7 @@ export async function startConsumer(): Promise<void> {
 			rabbitMessagesConsumed.inc();
 			// Acknowledge only after the message is recorded: a crash before this
 			// line returns it to the queue instead of losing it.
-			channel?.ack(msg);
+			ch.ack(msg);
 			log('info', 'RabbitMQ message consumed');
 		},
 		{ noAck: false, consumerTag: 'epochcloud-demo-consumer' }
@@ -221,10 +211,10 @@ export async function getQueueInfo() {
 
 /** Close the channel and the connection on shutdown so the broker sees a clean goodbye. */
 export async function closeRabbit(): Promise<void> {
-	if (reconnectTimeout) clearTimeout(reconnectTimeout);
-	reconnectTimeout = null;
 	const conn = connection;
 	connection = null;
 	channel = null;
+	consuming = false;
+	// Closing the recovering connection also stops its reconnects.
 	await conn?.close().catch(() => {});
 }
