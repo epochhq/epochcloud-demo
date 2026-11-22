@@ -8,6 +8,7 @@ import { rabbitConnected, rabbitMessagesPublished, rabbitMessagesConsumed, rabbi
 let connection: ChannelModel | null = null;
 let channel: ConfirmChannel | null = null;
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+let consuming = false;
 let backoffMs = 1000;
 const MAX_BACKOFF = 30000;
 const PUBLISH_CONFIRM_TIMEOUT_MS = PUBLISH_CONFIRM_MS;
@@ -34,6 +35,7 @@ async function connect(): Promise<void> {
 		connection.on('close', () => {
 			log('warn', 'RabbitMQ connection closed, reconnecting...');
 			rabbitConnected.set(0);
+			consuming = false;
 			channel = null;
 			connection = null;
 			scheduleReconnect();
@@ -58,6 +60,7 @@ async function connect(): Promise<void> {
 		// close handler rebuilds both through the normal reconnect path.
 		ch.on('close', () => {
 			if (channel === ch) {
+				consuming = false;
 				channel = null;
 				connection?.close().catch(() => {});
 			}
@@ -110,7 +113,17 @@ export async function startConsumer(): Promise<void> {
 	await channel.consume(
 		config.rabbitmq.queue,
 		(msg) => {
-			if (!msg) return;
+			if (!msg) {
+				// RabbitMQ cancelled this consumer (its queue was deleted or
+				// recreated). The channel stays open, so nothing subscribes again by
+				// itself and the pod would sit Ready with no consumer. End the channel:
+				// its close handler cycles the connection and connect() subscribes
+				// on the new one.
+				consuming = false;
+				log('warn', 'RabbitMQ cancelled the consumer, reconnecting', { queue: config.rabbitmq.queue });
+				void channel?.close().catch(() => {});
+				return;
+			}
 			const content = msg.content.toString();
 			consumedMessages.unshift({
 				message: content,
@@ -128,7 +141,13 @@ export async function startConsumer(): Promise<void> {
 		{ noAck: false, consumerTag: 'epochcloud-demo-consumer' }
 	);
 
+	consuming = true;
 	log('info', 'RabbitMQ consumer started', { queue: config.rabbitmq.queue });
+}
+
+/** Whether a consumer is subscribed on the live channel. */
+export function isConsuming(): boolean {
+	return consuming;
 }
 
 export async function publishMessage(message: string): Promise<void> {
