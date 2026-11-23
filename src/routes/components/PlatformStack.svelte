@@ -80,6 +80,7 @@
 		'fail2ban (brute-force)',
 		'Kanister (data-recovery drills)',
 		'Buildah (image build)',
+		'regclient (chunked image push)',
 		'Squid (build egress proxy)',
 		'Tilt Inner Loop',
 		'Bun Runtime',
