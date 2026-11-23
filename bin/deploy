@@ -118,12 +118,11 @@ BUILD_CONTEXT_ABS="$(cd "$ROOT_DIR/$BUILD_CONTEXT" && pwd)"
 
 CI_TOOLS_IMAGE="${EPOCHCLOUD_REGISTRY_HOST}/ghcr/epochhq/ci-tools-build:${EPOCHCLOUD_CI_TOOLS_TAG}"
 
-# Push target: the grey-cloud registry-push host on :5443, bypassing Cloudflare's
-# ~100MB body cap on large layer uploads (CI_TOOLS_IMAGE above keeps the proxied
-# host; pulls are never capped). Derived from the registry host
-# (registry.<domain> -> registry-push.<domain>:5443) unless EPOCHCLOUD_PUSH_HOST
-# overrides it.
-PUSH_REGISTRY="${EPOCHCLOUD_PUSH_HOST:-registry-push.${EPOCHCLOUD_REGISTRY_HOST#registry.}:5443}"
+# Push target: the Cloudflare-proxied registry host, the one every pull uses.
+# ci-tools build-local sends a layer in chunks under Cloudflare's ~100MB
+# request-body cap, so a push needs no host of its own and works from anywhere.
+# EPOCHCLOUD_PUSH_HOST overrides it for a non-standard layout.
+PUSH_REGISTRY="${EPOCHCLOUD_PUSH_HOST:-$EPOCHCLOUD_REGISTRY_HOST}"
 
 echo "Building dev image ${EPOCHCLOUD_REGISTRY_HOST}/epochcloud/${IMAGE_BASE}-dev (commit ${COMMIT_SHA:0:7}) via ${CI_TOOLS_IMAGE}"
 
