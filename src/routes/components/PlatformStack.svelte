@@ -1,6 +1,7 @@
 <script lang="ts">
 	const stackOnline = [
 		'Proxmox VE + OpenTofu',
+		'Ansible (Talos + bootstrap)',
 		'Talos OS + K8s 1.36',
 		'Karpenter',
 		'Cilium + Hubble',
@@ -31,7 +32,10 @@
 		'SLSA Build L3 Provenance',
 		'Syft + Grype',
 		'Semgrep + Trivy',
+		'TruffleHog + OSV-Scanner',
+		'Checkov + TFLint',
 		'Pluto (deprecated APIs)',
+		'Nova (outdated images)',
 		'OWASP ZAP',
 		'Headlamp',
 		'kubernetes-reflector',
@@ -65,6 +69,7 @@
 		'Resend Email',
 		'Knative Serving',
 		'Rybbit Analytics',
+		'ClickHouse (analytics store)',
 		'GO Feature Flag',
 		'Grafana Faro (Web Vitals)',
 		'Falco Runtime',
@@ -74,7 +79,11 @@
 		'LitmusChaos',
 		'fail2ban (brute-force)',
 		'Kanister (data-recovery drills)',
+		'Buildah (image build)',
+		'Squid (build egress proxy)',
 		'Tilt Inner Loop',
+		'Bun Runtime',
+		'Nix Dev Shell',
 		'Fastlane (iOS + Android)'
 	];
 
