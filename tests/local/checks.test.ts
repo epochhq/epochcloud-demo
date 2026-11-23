@@ -1,7 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vite-plus/test';
 
 vi.mock('$app/env/private', () => ({ PROMETHEUS_URL: 'http://prom.test' }));
-vi.mock('#lib/server/config.js', () => ({ config: { podNamespace: 'epochcloud-demo-dev' } }));
+const config = vi.hoisted(() => ({ podNamespace: 'epochcloud-demo-dev', entrypointUrl: '' }));
+vi.mock('#lib/server/config.js', () => ({ config }));
 vi.mock('#lib/server/rabbitmq.js', () => ({ getRabbitStatus: vi.fn() }));
 vi.mock('#lib/server/valkey.js', () => ({ pingValkey: vi.fn() }));
 vi.mock('#lib/server/cnpg.js', () => ({ getCnpgStatus: vi.fn() }));
@@ -95,7 +96,10 @@ function prometheus(series: Labels[], failing: boolean | ((query: string) => boo
 	});
 }
 
-beforeEach(() => vi.unstubAllGlobals());
+beforeEach(() => {
+	vi.unstubAllGlobals();
+	config.entrypointUrl = '';
+});
 
 const NOT_RUNNING = { connected: false, state: 'not-running', reason: 'No request from Traefik to the app in the last 10 minutes' };
 
@@ -176,6 +180,95 @@ it('fails, with 503, when the queries do not answer', async () => {
 	const response = snapshotResponse('linkerd', 6_000);
 	expect(response.status).toBe(503);
 	expect(await response.json()).toMatchObject({ connected: false, error: 'the check failed' });
+});
+
+// An idle demo: the series Traefik's proxy keeps toward the app disappear after
+// ten idle minutes, and a request recreates one that Prometheus holds from its
+// next scrape on. The check sends that request itself, through the public
+// entrypoint, and reads what earlier runs sent.
+const ENTRYPOINT = 'https://demo-dev.test';
+
+/** A fake Prometheus plus a fake entrypoint: the entrypoint's answer, and the series a request leaves for the scrape to publish. */
+function idleWorld(entrypoint: () => Response | Promise<Response>, leaves: Labels[] = []) {
+	const published: Labels[] = [];
+	const pending: Labels[] = [];
+	const probes: string[] = [];
+	vi.stubGlobal('fetch', async (url: string) => {
+		if (url.startsWith(ENTRYPOINT)) {
+			probes.push(url);
+			pending.push(...leaves);
+			return entrypoint();
+		}
+		const q = decodeURIComponent(new globalThis.URL(url).searchParams.get('query') ?? '');
+		const count = published.filter((labels) => selects(q, labels)).length;
+		return Response.json({ status: 'success', data: { result: count ? [{ metric: {}, value: [0, String(count)] }] : [] } });
+	});
+	/** Prometheus scrapes the proxy: what the requests left becomes queryable. */
+	const scrape = () => void published.push(...pending.splice(0));
+	return { published, probes, scrape };
+}
+
+it('sends a request through the entrypoint on every run, and says so when the series is not scraped yet', async () => {
+	config.entrypointUrl = ENTRYPOINT;
+	const world = idleWorld(() => new Response('{}'));
+	await refresh('linkerd', 8_100);
+	expect(world.probes).toEqual([`${ENTRYPOINT}/health`]);
+	const response = snapshotResponse('linkerd', 8_100);
+	expect(response.status).toBe(200);
+	expect(await response.json()).toMatchObject({ connected: false, state: 'not-running', reason: expect.stringContaining('Probed the entrypoint just now') });
+});
+
+it('is connected on an idle demo from the second run, on the series the request of the first run created', async () => {
+	config.entrypointUrl = ENTRYPOINT;
+	// The proxy recreates the series on the request; the scrape publishes it before the next run.
+	const world = idleWorld(() => new Response('{}'), [toApp()]);
+	await refresh('linkerd', 8_200);
+	expect(await snapshotResponse('linkerd', 8_200).json()).toMatchObject({ state: 'not-running' });
+	world.scrape();
+	await refresh('linkerd', 8_300);
+	expect(await snapshotResponse('linkerd', 8_300).json()).toMatchObject({ connected: true, mtls_series_10m: 1 });
+	expect(world.probes.length).toBe(2);
+});
+
+it('still fails, with 503, on a plaintext series from Traefik while the probe is answered', async () => {
+	config.entrypointUrl = ENTRYPOINT;
+	const world = idleWorld(() => new Response('{}'));
+	world.published.push(toApp(), toApp({ tls: 'no_identity', no_tls_reason: 'no_tls_from_remote' }));
+	await refresh('linkerd', 8_400);
+	expect(snapshotResponse('linkerd', 8_400).status).toBe(503);
+});
+
+it('fails, with 503, when the entrypoint does not answer the probe and there is no series to show', async () => {
+	config.entrypointUrl = ENTRYPOINT;
+	idleWorld(() => new Response('down', { status: 503 }));
+	await refresh('linkerd', 8_500);
+	const response = snapshotResponse('linkerd', 8_500);
+	expect(response.status).toBe(503);
+	expect(await response.json()).toMatchObject({ connected: false, error: 'the check failed' });
+});
+
+it('does not hide an unreachable entrypoint behind a no-series answer when the probe throws', async () => {
+	config.entrypointUrl = ENTRYPOINT;
+	idleWorld(() => {
+		throw new Error('connection refused');
+	});
+	await refresh('linkerd', 8_600);
+	expect(snapshotResponse('linkerd', 8_600).status).toBe(503);
+});
+
+it('stays connected on real mesh evidence when a probe fails', async () => {
+	config.entrypointUrl = ENTRYPOINT;
+	const world = idleWorld(() => new Response('down', { status: 503 }));
+	world.published.push(toApp());
+	await refresh('linkerd', 8_700);
+	expect(await snapshotResponse('linkerd', 8_700).json()).toMatchObject({ connected: true, mtls_series_10m: 1 });
+});
+
+it('sends no request to the entrypoint, and keeps the no-request answer, where no public address is configured', async () => {
+	const world = idleWorld(() => new Response('{}'));
+	await refresh('linkerd', 8_800);
+	expect(world.probes).toEqual([]);
+	expect(await snapshotResponse('linkerd', 8_800).json()).toMatchObject(NOT_RUNNING);
 });
 
 // The proofs check connects whenever Prometheus answered at least one query. It

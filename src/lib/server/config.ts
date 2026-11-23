@@ -149,6 +149,10 @@ export const config = {
 		}
 	},
 
+	// The public address this environment is served at (https://<host>, no path).
+	// The Linkerd check sends its own request to it; unset skips that request.
+	entrypointUrl: env.ENTRYPOINT_URL || '',
+
 	// Grafana Faro frontend observability
 	faro: {
 		// Where the collector accepts browser telemetry; unset disables the relay.
