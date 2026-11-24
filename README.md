@@ -144,7 +144,9 @@ The Prometheus and Linkerd tabs render a data array of namespace-limited queries
 | `RABBITMQ_QUEUE`              | `epochcloud-demo`   | Queue name                                            |
 | `VALKEY_HOST`                 | _(disabled)_        | Valkey/Redis host                                     |
 | `VALKEY_PORT`                 | `6379`              | Valkey port                                           |
+| `VALKEY_USERNAME`             |                     | Valkey ACL user; unset logs in as `default`           |
 | `VALKEY_PASSWORD`             |                     | Valkey password                                       |
+| `VALKEY_KEY_PREFIX`           |                     | Prefix added to every key; unset adds none            |
 | `VALKEY_DATABASE`             | `0`                 | Valkey DB number                                      |
 | `DEFECTDOJO_URL`              | _(disabled)_        | DefectDojo API URL                                    |
 | `DEFECTDOJO_TOKEN`            |                     | DefectDojo API token                                  |

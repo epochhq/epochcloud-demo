@@ -56,6 +56,11 @@ export const config = {
 		host: valkeyHost,
 		port: parseInt(readSecret('VALKEY_PORT') || '6379'),
 		password: readSecret('VALKEY_PASSWORD') || '',
+		// The platform gives each environment its own ACL user and a key prefix
+		// that user may touch. Both stay empty without them: the client then
+		// logs in as `default` with no prefix, as before.
+		username: readSecret('VALKEY_USERNAME') || '',
+		keyPrefix: readSecret('VALKEY_KEY_PREFIX') || '',
 		database: parseInt(readSecret('VALKEY_DATABASE') || '0'),
 		get enabled() {
 			return !!valkeyHost;
