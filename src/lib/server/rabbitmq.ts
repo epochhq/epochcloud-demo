@@ -1,4 +1,12 @@
-import amqplib, { type Connection, type ConfirmChannel, type RecoveringConnection, type Replies } from 'amqplib/callback_api';
+import { promisify } from 'node:util';
+import amqplib, {
+	type Connection,
+	type ConfirmChannel,
+	type RecoveringConnection,
+	type Replies,
+	type ConsumeMessage,
+	type Options
+} from 'amqplib/callback_api';
 import { config } from './config.js';
 import { PUBLISH_CONFIRM_MS, UPSTREAM_TIMEOUT_MS } from '../limits.js';
 import { withDeadline } from './http.js';
@@ -21,14 +29,6 @@ const BROKER_PROBE_TIMEOUT_MS = 2000;
 const consumedMessages: Array<{ message: string; timestamp: string }> = [];
 const MAX_CONSUMED = 10;
 
-// amqplib's callback API reports each result through a callback; this turns one
-// call into a promise for the async code below.
-function call<T>(run: (done: (err: Error | null, result: T) => void) => void): Promise<T> {
-	return new Promise<T>((resolve, reject) => {
-		run((err, result) => (err ? reject(err) : resolve(result)));
-	});
-}
-
 // close() on an amqplib channel or connection throws when it is already closing.
 function closeQuietly(target: { close(done?: (err: Error) => void): void }): void {
 	try {
@@ -39,7 +39,8 @@ function closeQuietly(target: { close(done?: (err: Error) => void): void }): voi
 }
 
 function checkQueue(ch: ConfirmChannel): Promise<Replies.AssertQueue> {
-	return call((done) => ch.checkQueue(config.rabbitmq.queue, done));
+	const check = ch.checkQueue.bind(ch) as (queue: string, done: (err: Error | null, ok: Replies.AssertQueue) => void) => void;
+	return promisify(check)(config.rabbitmq.queue);
 }
 
 function getUrl(): string {
@@ -56,9 +57,8 @@ async function setup(model: Connection): Promise<void> {
 	try {
 		// Confirm channel: the broker acks every publish, so publishMessage
 		// can distinguish delivered from dropped instead of fire-and-forget.
-		const ch = await call<ConfirmChannel>((done) => {
-			model.createConfirmChannel(done);
-		});
+		const open = model.createConfirmChannel.bind(model) as (done: (err: Error | null, ch: ConfirmChannel) => void) => void;
+		const ch = await promisify(open)();
 
 		ch.on('error', (err) => {
 			log('error', 'RabbitMQ channel error', { error: String(err) });
@@ -123,39 +123,39 @@ export async function initRabbitMQ(): Promise<void> {
 }
 
 async function startConsumer(ch: ConfirmChannel): Promise<void> {
-	await call((done) => {
-		ch.consume(
-			config.rabbitmq.queue,
-			(msg) => {
-				if (!msg) {
-					// RabbitMQ cancelled this consumer (its queue was deleted or
-					// recreated). The channel stays open and recovery watches only the
-					// connection, so nothing would subscribe again and the pod would sit
-					// Ready with no consumer. End the channel: its close handler closes
-					// the connection and recovery runs setup on a new one.
-					consuming = false;
-					log('warn', 'RabbitMQ cancelled the consumer, reconnecting', { queue: config.rabbitmq.queue });
-					closeQuietly(ch);
-					return;
-				}
-				const content = msg.content.toString();
-				consumedMessages.unshift({
-					message: content,
-					timestamp: new Date().toISOString()
-				});
-				if (consumedMessages.length > MAX_CONSUMED) {
-					consumedMessages.pop();
-				}
-				rabbitMessagesConsumed.inc();
-				// Acknowledge only after the message is recorded: a crash before this
-				// line returns it to the queue instead of losing it.
-				ch.ack(msg);
-				log('info', 'RabbitMQ message consumed');
-			},
-			{ noAck: false, consumerTag: 'epochcloud-demo-consumer' },
-			done
-		);
-	});
+	const onMessage = (msg: ConsumeMessage | null): void => {
+		if (!msg) {
+			// RabbitMQ cancelled this consumer (its queue was deleted or
+			// recreated). The channel stays open and recovery watches only the
+			// connection, so nothing would subscribe again and the pod would sit
+			// Ready with no consumer. End the channel: its close handler closes
+			// the connection and recovery runs setup on a new one.
+			consuming = false;
+			log('warn', 'RabbitMQ cancelled the consumer, reconnecting', { queue: config.rabbitmq.queue });
+			closeQuietly(ch);
+			return;
+		}
+		const content = msg.content.toString();
+		consumedMessages.unshift({
+			message: content,
+			timestamp: new Date().toISOString()
+		});
+		if (consumedMessages.length > MAX_CONSUMED) {
+			consumedMessages.pop();
+		}
+		rabbitMessagesConsumed.inc();
+		// Acknowledge only after the message is recorded: a crash before this
+		// line returns it to the queue instead of losing it.
+		ch.ack(msg);
+		log('info', 'RabbitMQ message consumed');
+	};
+	const consume = ch.consume.bind(ch) as (
+		queue: string,
+		onMessage: (msg: ConsumeMessage | null) => void,
+		options: Options.Consume,
+		done: (err: Error | null, ok: Replies.Consume) => void
+	) => void;
+	await promisify(consume)(config.rabbitmq.queue, onMessage, { noAck: false, consumerTag: 'epochcloud-demo-consumer' });
 
 	consuming = true;
 	log('info', 'RabbitMQ consumer started', { queue: config.rabbitmq.queue });
