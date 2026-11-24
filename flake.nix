@@ -7,10 +7,10 @@
     bun-x86_64-darwin = { url = "file+https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-x64-baseline.zip"; flake = false; };
     bun-aarch64-linux = { url = "file+https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip"; flake = false; };
     bun-x86_64-linux = { url = "file+https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip"; flake = false; };
-    node-aarch64-darwin = { url = "file+https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-arm64.tar.xz"; flake = false; };
-    node-x86_64-darwin = { url = "file+https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-x64.tar.xz"; flake = false; };
-    node-aarch64-linux = { url = "file+https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-arm64.tar.xz"; flake = false; };
-    node-x86_64-linux = { url = "file+https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-x64.tar.xz"; flake = false; };
+    node-aarch64-darwin = { url = "file+https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-arm64.tar.xz"; flake = false; };
+    node-x86_64-darwin = { url = "file+https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-x64.tar.xz"; flake = false; };
+    node-aarch64-linux = { url = "file+https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-arm64.tar.xz"; flake = false; };
+    node-x86_64-linux = { url = "file+https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-x64.tar.xz"; flake = false; };
   };
   outputs = inputs@{ self, nixpkgs, flake-utils, ... }:
     let
