@@ -85,49 +85,49 @@
     "node-aarch64-darwin": {
       "flake": false,
       "locked": {
-        "narHash": "sha256-JTZBd3E8n8w2H/h0zzpfxO/OpHWaP7pF4pBA7h4CVa0=",
+        "narHash": "sha256-6DM2I6rXdRJ9owB7z1qSlDGaz1qTrYBK748jtL2HgKM=",
         "type": "file",
-        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-arm64.tar.xz"
+        "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-arm64.tar.xz"
       },
       "original": {
         "type": "file",
-        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-arm64.tar.xz"
+        "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-arm64.tar.xz"
       }
     },
     "node-aarch64-linux": {
       "flake": false,
       "locked": {
-        "narHash": "sha256-UUJeC1cTFu4qEX3/JuXpaHncJLV6LyL9d/OFLfEbCsk=",
+        "narHash": "sha256-oWoULztUeXEB52eX8aNtSCleBev6OEyAWVbResNS0kg=",
         "type": "file",
-        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-arm64.tar.xz"
+        "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-arm64.tar.xz"
       },
       "original": {
         "type": "file",
-        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-arm64.tar.xz"
+        "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-arm64.tar.xz"
       }
     },
     "node-x86_64-darwin": {
       "flake": false,
       "locked": {
-        "narHash": "sha256-fvyUs1+RNNRze03Q07zAVQU5N32x8D+irGoUFv3fhu8=",
+        "narHash": "sha256-z34pzub+2sNml9Cl5xNQETVOgxmuztwSzfIaaZT53PI=",
         "type": "file",
-        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-x64.tar.xz"
+        "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-x64.tar.xz"
       },
       "original": {
         "type": "file",
-        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-x64.tar.xz"
+        "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-x64.tar.xz"
       }
     },
     "node-x86_64-linux": {
       "flake": false,
       "locked": {
-        "narHash": "sha256-alfyYrFRUFJtUgQhvBnyss3szzFEMAyvhQNv2CqwlCQ=",
+        "narHash": "sha256-bdsDHanq9JI57ySuj1/bAQqocthAOOxYc25bvEbBtzc=",
         "type": "file",
-        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-x64.tar.xz"
+        "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-x64.tar.xz"
       },
       "original": {
         "type": "file",
-        "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-x64.tar.xz"
+        "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-x64.tar.xz"
       }
     },
     "root": {
