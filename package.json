@@ -20,7 +20,7 @@
 		"lint:svelte": "eslint \"src/**/*.svelte\""
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-bun": "1.0.0",
+		"@sveltejs/adapter-bun": "1.0.1",
 		"@sveltejs/kit": "3.1.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@types/amqplib": "^0.10.7",
